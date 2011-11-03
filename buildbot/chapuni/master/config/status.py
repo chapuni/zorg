@@ -44,10 +44,10 @@ def get_status_targets(standard_builders):
             extraRecipients = [default_email],
             mode = "problem",
             builders = standard_builders),
-        buildbot.status.words.IRC(
-            host = "irc.oftc.net", nick = "bb-chapuni", channels = ["#llvm"],
-            allowForce = True,
-            notify_events = ['successToFailure', 'failureToSuccess']),
+        # buildbot.status.words.IRC(
+        #     host = "irc.oftc.net", nick = "bb-chapuni", channels = ["#llvm"],
+        #     allowForce = True,
+        #     notify_events = ['successToFailure', 'failureToSuccess']),
         buildbot.status.words.IRC(
             "irc.freenode.net", "bb-chapuni",
             channels=[{"channel": "#llvmjp"}],
