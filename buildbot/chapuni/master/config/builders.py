@@ -26,86 +26,9 @@ from buildbot import locks
 centos5_lock = locks.SlaveLock("centos5_lock")
 
 # Factories
-def AddGitLLVM(factory):
-    factory.addStep(Git(repourl='/var/cache/llvm-project.git',
-                        reference='/var/cache/llvm-project.git',
-                        workdir='llvm-project'))
-    factory.addStep(SetProperty(name="got_revision",
-                                command=["git", "describe", "--tags"],
-                                workdir="llvm-project",
-                                property="got_revision"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "foreach",
-                                          "git checkout -f; git clean -fx"],
-                                 workdir="llvm-project"))
-    factory.addStep(SetProperty(name="llvm_submodule_isready",
-                                command=["git",
-                                         "--git-dir", "llvm/.git",
-                                         "ls-tree",
-                                         "--name-only",
-                                         "HEAD", "CMakeLists.txt"],
-                                workdir="llvm-project",
-                                flunkOnFailure=False,
-                                property="clang_CMakeLists"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "update",
-                                          "--init",
-                                          "--reference",
-                                          "/var/cache/llvm-project.git",
-                                          "llvm"],
-                                 haltOnFailure = True,
-                                 workdir="llvm-project"))
-
-def AddGitClang(factory):
-    factory.addStep(Git(repourl='/var/cache/llvm-project.git',
-                        reference='/var/cache/llvm-project.git',
-                        workdir='llvm-project'))
-    factory.addStep(SetProperty(name="got_revision",
-                                command=["git", "describe", "--tags"],
-                                workdir="llvm-project",
-                                property="got_revision"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "foreach",
-                                          "git checkout -f; git clean -fx"],
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "update",
-                                          "--init",
-                                          "--reference",
-                                          "/var/cache/llvm-project.git",
-                                          "llvm"],
-                                 haltOnFailure = True,
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(command=["ln",
-                                          "-svf",
-                                          "../../clang", "llvm/tools/."],
-                                 workdir="llvm-project"))
-    factory.addStep(SetProperty(name="llvm_submodule_isready",
-                                command=["git",
-                                         "--git-dir", "llvm/tools/clang/.git",
-                                         "ls-tree",
-                                         "--name-only",
-                                         "HEAD", "CMakeLists.txt"],
-                                workdir="llvm-project",
-                                flunkOnFailure=False,
-                                property="clang_CMakeLists"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "update",
-                                          "--init",
-                                          "--reference",
-                                          "/var/cache/llvm-project.git",
-                                          "clang"],
-                                 haltOnFailure = True,
-                                 workdir="llvm-project"))
-
-def AddGitLLVMClang(factory, isLLVM, isClang):
-    factory.addStep(Git(repourl='/var/cache/llvm-project.git',
-                        reference='/var/cache/llvm-project.git',
+def AddGitLLVMClang(factory, isLLVM, isClang, repo, ref):
+    factory.addStep(Git(repourl=repo,
+                        reference=ref,
                         workdir='llvm-project'))
     factory.addStep(SetProperty(name="got_revision",
                                 command=["git", "describe", "--tags"],
@@ -130,8 +53,7 @@ def AddGitLLVMClang(factory, isLLVM, isClang):
                                           "submodule",
                                           "update",
                                           "--init",
-                                          "--reference",
-                                          "/var/cache/llvm-project.git",
+                                          "--reference", ref,
                                           "llvm"],
                                  haltOnFailure = True,
                                  workdir="llvm-project"))
@@ -153,8 +75,7 @@ def AddGitLLVMClang(factory, isLLVM, isClang):
                                               "submodule",
                                               "update",
                                               "--init",
-                                              "--reference",
-                                              "/var/cache/llvm-project.git",
+                                              "--reference", ref,
                                               "clang"],
                                      haltOnFailure = True,
                                      workdir="llvm-project"))
@@ -245,8 +166,7 @@ def AddGitWin7(factory):
                                  workdir="llvm-project"))
 
 def AddCMake(factory, doStepIf=None):
-    factory.addStep(ShellCommand(name="CMake",
-                                 description="configuring CMake",
+    factory.addStep(ShellCommand(description="configuring CMake",
                                  descriptionDone="CMake",
                                  command=["/home/chapuni/BUILD/cmake-2.8.2/bin/cmake",
                                           "-DLLVM_TARGETS_TO_BUILD=all",
@@ -275,7 +195,9 @@ def get_builders():
 
     # CentOS5(clang only)
     factory = BuildFactory()
-    AddGitLLVMClang(factory, False, True)
+    AddGitLLVMClang(factory, False, True,
+                    '/var/cache/llvm-project.git',
+                    '/var/cache/llvm-project.git')
     AddCMake(factory, clang_not_ready)
     factory.addStep(Test(name="test_clang",
                          locks=[centos5_lock.access('counting')],
@@ -287,7 +209,9 @@ def get_builders():
 
     # CentOS5(3stage)
     factory = BuildFactory()
-    AddGitLLVMClang(factory, False, True)
+    AddGitLLVMClang(factory, False, True,
+                    '/var/cache/llvm-project.git',
+                    '/var/cache/llvm-project.git')
     factory.addStep(RemoveDirectory(dir="/home/chapuni/bb/clang-3stage-x86_64-linux/builds"))
     factory.addStep(ShellCommand(name="CMake",
                                  description="configuring CMake",
@@ -412,7 +336,9 @@ def get_builders():
 
     # CentOS5(llvm-x86)
     factory = BuildFactory()
-    AddGitLLVMClang(factory, True, False)
+    AddGitLLVMClang(factory, True, False,
+                    '/var/cache/llvm-project.git',
+                    '/var/cache/llvm-project.git')
     AddCMake(factory, clang_not_ready)
     factory.addStep(Test(name="build_test_llvm",
                          command=["make", "-j4", "-k", "check"]))
@@ -425,49 +351,9 @@ def get_builders():
     # Cygwin
     factory = BuildFactory()
     # check out the source
-    factory.addStep(Git(repourl='chapuni@192.168.1.193:/var/cache/llvm-project.git',
-                        reference='/cygdrive/d/llvm-project.git',
-                        workdir='llvm-project'))
-    factory.addStep(SetProperty(name="got_revision",
-                                command=["git", "describe", "--tags"],
-                                workdir="llvm-project",
-                                property="got_revision"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "foreach",
-                                          "git checkout -f; git clean -fx"],
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "update",
-                                          "--init",
-                                          "--reference",
-                                          "/cygdrive/d/llvm-project.git",
-                                          "llvm"],
-                                 haltOnFailure = True,
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(command=["ln",
-                                          "-svf",
-                                          "../../clang", "llvm/tools/."],
-                                 workdir="llvm-project"))
-    factory.addStep(SetProperty(name="llvm_submodule_isready",
-                                command=["git",
-                                         "--git-dir", "llvm/tools/clang/.git",
-                                         "ls-tree",
-                                         "--name-only",
-                                         "HEAD", "CMakeLists.txt"],
-                                workdir="llvm-project",
-                                flunkOnFailure=False,
-                                property="clang_CMakeLists"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "update",
-                                          "--init",
-                                          "--reference",
-                                          "/cygdrive/d/llvm-project.git",
-                                          "clang"],
-                                 haltOnFailure = True,
-                                 workdir="llvm-project"))
+    AddGitLLVMClang(factory, False, True,
+                    'chapuni@192.168.1.193:/var/cache/llvm-project.git',
+                    '/cygdrive/d/llvm-project.git')
     PatchLLVM(factory, "llvm.patch")
     factory.addStep(ShellCommand(command=["../llvm-project/llvm/configure",
                                           "-C",
@@ -484,9 +370,6 @@ def get_builders():
                             flunkOnFailure=False,
                             command=["make", "VERBOSE=1", "-k", "-j8"]))
     factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"]))
-    factory.addStep(ShellCommand(command=["sh", "-c",
-                                          "mkdir xxx;mv -v Release+Asserts/bin/* xxx;cp -v xxx/* Release+Asserts/bin;rm -rf xxx"],
-                                 workdir="build"))
     factory.addStep(Test(name="test_clang",
                          command=["make", "TESTARGS=-v -j1",
                                   "-C", "tools/clang/test"]))
@@ -506,49 +389,9 @@ def get_builders():
                                           "--git-dir", "/home/chapuni/llvm-project.git",
                                           "fetch", "origin"],
                                  flunkOnFailure=False));
-    factory.addStep(Git(repourl='chapuni@192.168.1.193:/var/cache/llvm-project.git',
-                        reference='/home/chapuni/llvm-project.git',
-                        workdir='llvm-project'))
-    factory.addStep(SetProperty(name="got_revision",
-                                command=["git", "describe", "--tags"],
-                                workdir="llvm-project",
-                                property="got_revision"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "foreach",
-                                          "git checkout -f; git clean -fx"],
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "update",
-                                          "--init",
-                                          "--reference",
-                                          "/home/chapuni/llvm-project.git",
-                                          "llvm"],
-                                 haltOnFailure = True,
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(command=["ln",
-                                          "-svf",
-                                          "../../clang", "llvm/tools/."],
-                                 workdir="llvm-project"))
-    factory.addStep(SetProperty(name="llvm_submodule_isready",
-                                command=["git",
-                                         "--git-dir", "llvm/tools/clang/.git",
-                                         "ls-tree",
-                                         "--name-only",
-                                         "HEAD", "CMakeLists.txt"],
-                                workdir="llvm-project",
-                                flunkOnFailure=False,
-                                property="clang_CMakeLists"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "submodule",
-                                          "update",
-                                          "--init",
-                                          "--reference",
-                                          "/home/chapuni/llvm-project.git",
-                                          "clang"],
-                                 haltOnFailure = True,
-                                 workdir="llvm-project"))
+    AddGitLLVMClang(factory, False, True,
+                    'chapuni@192.168.1.193:/var/cache/llvm-project.git',
+                    '/home/chapuni/llvm-project.git')
     factory.addStep(ShellCommand(command=["../llvm-project/llvm/configure",
                                           "-C",
                                           "--build=ppc-redhat-linux",
