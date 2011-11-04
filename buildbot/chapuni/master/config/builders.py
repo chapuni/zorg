@@ -86,7 +86,7 @@ def AddGitWin7(factory):
     factory.addStep(ShellCommand(name="git-fetch",
                                 command=["git",
                                          "--git-dir", "D:/llvm-project.git",
-                                         "fetch", "centos5"],
+                                         "fetch", "--prune"],
                                 flunkOnFailure=False));
     factory.addStep(Git(name="update_llvm_project",
                         repourl='chapuni@192.168.1.193:/var/cache/llvm-project.git',
