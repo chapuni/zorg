@@ -134,7 +134,7 @@ def AddGitWin7(factory):
                                           "-n",
                                           "--reference",
                                           "d:/llvm-project.git",
-                                          "git@github.com:chapuni/clang.git"],
+                                          "http://llvm.org/git/clang.git"],
                                  doStepIf=clang_not_ready,
                                  workdir="llvm-project"))
     factory.addStep(ShellCommand(name="clang_git_worktree",
