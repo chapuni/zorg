@@ -527,17 +527,19 @@ def get_builders():
                                      "-p:Configuration=Release",
                                      "LLVM.sln"]))
     factory.addStep(ClangTestCommand(name="test_clang",
-                         command=["c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe",
-                                  "-m",
-                                  "-v:m",
-                                  "-p:Configuration=Release",
-                                  r"tools\clang\test\clang-test.vcxproj"]))
+                         command=["c:/Python27/python.exe",
+                                  "../llvm-project/llvm/utils/lit/lit.py",
+                                  "--param", "build_config=Release",
+                                  "--param", "build_mode=Release",
+                                  "-v", "-j1",
+                                  "tools/clang/test"]))
     factory.addStep(ClangTestCommand(name="test_llvm",
-                         command=["c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe",
-                                  "-m",
-                                  "-v:m",
-                                  "-p:Configuration=Release",
-                                  "test\check.vcxproj"]))
+                         command=["c:/Python27/python.exe",
+                                  "../llvm-project/llvm/utils/lit/lit.py",
+                                  "--param", "build_config=Release",
+                                  "--param", "build_mode=Release",
+                                  "-v", "-j1",
+                                  "test"]))
     yield BuilderConfig(name="cmake-clang-i686-msvc10",
                         mergeRequests=True,
                         slavenames=["win7"],
