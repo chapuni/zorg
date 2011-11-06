@@ -201,10 +201,14 @@ def get_builders():
                     '/var/cache/llvm-project.git',
                     '/var/cache/llvm-project.git')
     AddCMake(factory, clang_not_ready)
-    factory.addStep(ClangTestCommand(
-            name            = 'build_test_clang',
-            command         = ["make", "-j4", "-k", "clang-test"],
+    factory.addStep(Compile(
+            command         = ["make", "-j4", "-k", "clang-test.deps"],
             locks           = [centos5_lock.access('counting')],
+            name            = 'build_clang'))
+    factory.addStep(ClangTestCommand(
+            name            = 'test_clang',
+            locks           = [centos5_lock.access('counting')],
+            command         = ["make", "-j4", "clang-test"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
     yield BuilderConfig(name="cmake-clang-x86_64-linux",
@@ -351,9 +355,12 @@ def get_builders():
                     '/var/cache/llvm-project.git',
                     '/var/cache/llvm-project.git')
     AddCMake(factory, clang_not_ready)
+    factory.addStep(Compile(
+            command         = ["make", "-j4", "-k", "check.deps"],
+            name            = 'build_llvm'))
     factory.addStep(ClangTestCommand(
-            name            = 'build_test_llvm',
-            command         = ["make", "-j4", "-k", "check"],
+            name            = 'test_llvm',
+            command         = ["make", "-j4", "check"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
     yield BuilderConfig(name="cmake-llvm-x86_64-linux",
