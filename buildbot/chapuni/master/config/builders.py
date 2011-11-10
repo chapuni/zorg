@@ -394,6 +394,12 @@ def get_builders():
                             flunkOnFailure=False,
                             command=["make", "VERBOSE=1", "-k", "-j8"]))
     factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"]))
+
+    # XXX
+    factory.addStep(ShellCommand(command=["sh", "-c",
+                                          "for x in Release*/bin; do mkdir xxx;mv -v $x/* xxx;cp -v xxx/* $x;rm -rf xxx; done"],
+                                 workdir="build"))
+
     factory.addStep(ClangTestCommand(name="test_clang",
                          command=["make", "TESTARGS=-v -j1",
                                   "-C", "tools/clang/test"]))
