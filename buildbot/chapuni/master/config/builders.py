@@ -27,6 +27,7 @@ def not_triggered(step):
 
 from buildbot import locks
 centos5_lock = locks.SlaveLock("centos5_lock")
+win7_git_lock = locks.SlaveLock("win7_git_lock")
 
 # Factories
 def AddGitLLVMClang(factory, isLLVM, isClang, repo, ref):
@@ -85,10 +86,11 @@ def AddGitLLVMClang(factory, isLLVM, isClang, repo, ref):
 
 def AddGitWin7(factory):
     factory.addStep(ShellCommand(name="git-fetch",
-                                command=["git",
-                                         "--git-dir", "D:/llvm-project.git",
-                                         "fetch", "--prune"],
-                                flunkOnFailure=False));
+                                 command=["git",
+                                          "--git-dir", "D:/llvm-project.git",
+                                          "fetch", "--prune"],
+                                 locks=[win7_git_lock.access('counting')],
+                                 flunkOnFailure=False));
     factory.addStep(Git(name="update_llvm_project",
                         repourl='chapuni@192.168.1.193:/var/cache/llvm-project.git',
                         reference='d:/llvm-project.git',
