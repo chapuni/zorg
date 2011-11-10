@@ -47,7 +47,11 @@ def get_status_targets(standard_builders):
         buildbot.status.words.IRC(
             host = "irc.oftc.net", nick = "bb-chapuni", channels = ["#llvm"],
             allowForce = True,
-            notify_events = ['successToFailure', 'failureToSuccess']),
+            notify_events={
+                'successToFailure': 1,
+                'failureToSuccess': 1,
+                'exceptionToSuccess': 1,
+                }),
         buildbot.status.words.IRC(
             "irc.freenode.net", "bb-chapuni",
             channels=[{"channel": "#llvmjp"}],
@@ -55,6 +59,7 @@ def get_status_targets(standard_builders):
             notify_events={
                 'successToFailure': 1,
                 'failureToSuccess': 1,
+                'exceptionToSuccess': 1,
                 'exception': 1,
                 }),
         InformativeMailNotifier(
