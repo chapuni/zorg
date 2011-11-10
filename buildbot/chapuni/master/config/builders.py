@@ -447,7 +447,7 @@ def get_builders():
     factory = BuildFactory()
     AddGitWin7(factory)
     PatchLLVM(factory, "makefile.patch")
-    PatchLLVM(factory, "llvm.patch")
+#    PatchLLVM(factory, "llvm.patch")
     PatchClang(factory, "clang.patch")
     factory.addStep(ShellCommand(command=["sh", "-c",
                                           "PATH=/bin:$PATH PWD=/e/bb-win7/clang-i686-msys/build /e/bb-win7/clang-i686-msys/llvm-project/llvm/configure -C --enable-optimized"],
@@ -475,7 +475,7 @@ def get_builders():
     # cmake-msys
     factory = BuildFactory()
     AddGitWin7(factory)
-    PatchLLVM(factory, "llvm.patch")
+#    PatchLLVM(factory, "llvm.patch")
     factory.addStep(ShellCommand(name="CMake",
                                  description="configuring CMake",
                                  descriptionDone="CMake",
@@ -501,7 +501,7 @@ def get_builders():
     # MSVC10
     factory = BuildFactory()
     AddGitWin7(factory)
-    PatchLLVM(factory, "llvm.patch")
+#    PatchLLVM(factory, "llvm.patch")
     factory.addStep(ShellCommand(name="CMake",
                                  description="configuring CMake",
                                  descriptionDone="CMake",
