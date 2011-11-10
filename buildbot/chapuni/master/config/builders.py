@@ -4,6 +4,7 @@
 
 from buildbot.process.factory import BuildFactory
 from buildbot.steps.source import Git
+from buildbot.steps.shell import WithProperties
 from buildbot.steps.shell import ShellCommand
 from buildbot.steps.shell import SetProperty
 from buildbot.steps.shell import Compile
@@ -221,12 +222,13 @@ def get_builders():
     AddGitLLVMClang(factory, False, True,
                     '/var/cache/llvm-project.git',
                     '/var/cache/llvm-project.git')
-    factory.addStep(RemoveDirectory(dir="/home/chapuni/bb/clang-3stage-x86_64-linux/builds"))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+                                    flunkOnFailure=False))
     factory.addStep(ShellCommand(name="CMake",
                                  description="configuring CMake",
                                  descriptionDone="CMake",
                                  command=["/home/chapuni/BUILD/cmake-2.8.2/bin/cmake",
-                                          "-DCMAKE_INSTALL_PREFIX=/home/chapuni/bb/clang-3stage-x86_64-linux/builds/install/stage1",
+                                          WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/builds/install/stage1"),
                                           "-DLLVM_TARGETS_TO_BUILD=X86",
                                           "-DCMAKE_C_COMPILER=/usr/bin/gcc44",
                                           "-DCMAKE_CXX_COMPILER=/usr/bin/g++44",
@@ -252,10 +254,10 @@ def get_builders():
                             command=["make", "install", "-k", "-j4"]))
 
     # stage 2
-    factory.addStep(ShellCommand(command=["../../llvm-project/llvm/configure",
-                                          "CC=/home/chapuni/bb/clang-3stage-x86_64-linux/builds/install/stage1/bin/clang -std=gnu89",
-                                          "CXX=/home/chapuni/bb/clang-3stage-x86_64-linux/builds/install/stage1/bin/clang++",
-                                          "--prefix=/home/chapuni/bb/clang-3stage-x86_64-linux/builds/install/stagen",
+    factory.addStep(ShellCommand(command=[WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                                          WithProperties("CC=%(workdir)s/builds/install/stage1/bin/clang -std=gnu89"),
+                                          WithProperties("CXX=%(workdir)s/builds/install/stage1/bin/clang++"),
+                                          WithProperties("--prefix=%(workdir)s/builds/install/stagen"),
                                           "--disable-timestamps",
                                           "--disable-assertions",
                                           "--enable-optimized"],
@@ -291,10 +293,10 @@ def get_builders():
                                  workdir="builds"))
 
     # stage 3
-    factory.addStep(ShellCommand(command=["../../llvm-project/llvm/configure",
-                                          "CC=/home/chapuni/bb/clang-3stage-x86_64-linux/builds/install/stage2/bin/clang -std=gnu89",
-                                          "CXX=/home/chapuni/bb/clang-3stage-x86_64-linux/builds/install/stage2/bin/clang++",
-                                          "--prefix=/home/chapuni/bb/clang-3stage-x86_64-linux/builds/install/stagen",
+    factory.addStep(ShellCommand(command=[WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                                          WithProperties("CC=%(workdir)s/builds/install/stage2/bin/clang -std=gnu89"),
+                                          WithProperties("CXX=%(workdir)s/builds/install/stage2/bin/clang++"),
+                                          WithProperties("--prefix=%(workdir)s/builds/install/stagen"),
                                           "--disable-timestamps",
                                           "--disable-assertions",
                                           "--enable-optimized"],
@@ -328,12 +330,13 @@ def get_builders():
                                           "stagen",
                                           "stage3"],
                                  workdir="builds"))
-    factory.addStep(RemoveDirectory(dir="/home/chapuni/bb/clang-3stage-x86_64-linux/last"))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
+                                    flunkOnFailure=False))
     factory.addStep(ShellCommand(name="save_builds",
                                  command=["mv", "-v",
                                           "builds",
                                           "last"],
-                                 workdir="/home/chapuni/bb/clang-3stage-x86_64-linux"))
+                                 workdir="."))
     factory.addStep(ShellCommand(name="compare_23",
                                  description="Comparing",
                                  descriptionDone="Compare-2-3",
