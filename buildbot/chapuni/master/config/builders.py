@@ -198,6 +198,26 @@ def PatchClang(factory, name):
 
 def get_builders():
 
+    # CentOS5(llvm-x86)
+    factory = BuildFactory()
+    AddGitLLVMClang(factory, True, False,
+                    '/var/cache/llvm-project.git',
+                    '/var/cache/llvm-project.git')
+    AddCMake(factory, clang_not_ready)
+    factory.addStep(Compile(
+            command         = ["make", "-j4", "-k", "check.deps"],
+            name            = 'build_llvm'))
+    factory.addStep(ClangTestCommand(
+            name            = 'test_llvm',
+            command         = ["make", "-j4", "check"],
+            description     = ["testing", "llvm"],
+            descriptionDone = ["test",    "llvm"]))
+    yield BuilderConfig(name="cmake-llvm-x86_64-linux",
+                        slavenames=["centos5"],
+                        mergeRequests=False,
+                        locks=[centos5_lock.access('counting')],
+                        factory=factory)
+
     # CentOS5(clang only)
     factory = BuildFactory()
     AddGitLLVMClang(factory, False, True,
@@ -352,26 +372,6 @@ def get_builders():
     yield BuilderConfig(name="clang-3stage-x86_64-linux",
                         slavenames=["centos5"],
                         mergeRequests=True,
-                        factory=factory)
-
-    # CentOS5(llvm-x86)
-    factory = BuildFactory()
-    AddGitLLVMClang(factory, True, False,
-                    '/var/cache/llvm-project.git',
-                    '/var/cache/llvm-project.git')
-    AddCMake(factory, clang_not_ready)
-    factory.addStep(Compile(
-            command         = ["make", "-j4", "-k", "check.deps"],
-            name            = 'build_llvm'))
-    factory.addStep(ClangTestCommand(
-            name            = 'test_llvm',
-            command         = ["make", "-j4", "check"],
-            description     = ["testing", "llvm"],
-            descriptionDone = ["test",    "llvm"]))
-    yield BuilderConfig(name="cmake-llvm-x86_64-linux",
-                        slavenames=["centos5"],
-                        mergeRequests=False,
-                        locks=[centos5_lock.access('counting')],
                         factory=factory)
 
     # Cygwin
