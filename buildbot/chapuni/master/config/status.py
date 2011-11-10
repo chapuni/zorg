@@ -67,6 +67,6 @@ def get_status_targets(standard_builders):
             extraRecipients=["geek4civic@gmail.com"],
             sendToInterestedUsers= False,
             subject="Build %(builder)s Failure",
-            mode = "failing",
+            mode = "problem",
             num_lines = 15),
         ]
