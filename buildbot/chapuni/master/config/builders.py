@@ -33,6 +33,7 @@ win7_git_lock = locks.SlaveLock("win7_git_lock")
 def AddGitLLVMClang(factory, isLLVM, isClang, repo, ref):
     factory.addStep(Git(repourl=repo,
                         reference=ref,
+                        timeout=3600,
                         workdir='llvm-project'))
     factory.addStep(SetProperty(name="got_revision",
                                 command=["git", "describe", "--tags"],
@@ -59,6 +60,7 @@ def AddGitLLVMClang(factory, isLLVM, isClang, repo, ref):
                                           "--init",
                                           "--reference", ref,
                                           "llvm"],
+                                 timeout=3600,
                                  haltOnFailure = True,
                                  workdir="llvm-project"))
     if isClang:
@@ -81,6 +83,7 @@ def AddGitLLVMClang(factory, isLLVM, isClang, repo, ref):
                                               "--init",
                                               "--reference", ref,
                                               "clang"],
+                                     timeout=3600,
                                      haltOnFailure = True,
                                      workdir="llvm-project"))
 
@@ -425,6 +428,7 @@ def get_builders():
                                  command=["git",
                                           "--git-dir", "/home/chapuni/llvm-project.git",
                                           "fetch", "origin"],
+                                 timeout=3600,
                                  flunkOnFailure=False));
     AddGitLLVMClang(factory, False, True,
                     'chapuni@192.168.1.193:/var/cache/llvm-project.git',
