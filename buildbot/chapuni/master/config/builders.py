@@ -427,7 +427,7 @@ def get_builders():
     factory.addStep(ShellCommand(name="git-fetch",
                                  command=["git",
                                           "--git-dir", "/home/chapuni/llvm-project.git",
-                                          "fetch", "origin"],
+                                          "fetch", "origin", "--prune"],
                                  timeout=3600,
                                  flunkOnFailure=False));
     AddGitLLVMClang(factory, False, True,
