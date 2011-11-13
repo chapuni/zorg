@@ -18,6 +18,9 @@ from zorg.buildbot.commands.ClangTestCommand import ClangTestCommand
 def clang_not_ready(step):
     return step.build.getProperty("clang_CMakeLists") != "CMakeLists.txt"
 
+def Makefile_not_ready(step):
+    return step.build.getProperty("exists_Makefile") != "OK"
+
 def sample_needed_update(step):
     return step.build.getProperty("branch") == "release_30"
 
@@ -28,6 +31,13 @@ def not_triggered(step):
 from buildbot import locks
 centos5_lock = locks.SlaveLock("centos5_lock")
 win7_git_lock = locks.SlaveLock("win7_git_lock")
+
+def CheckMakefile(factory, makefile="Makefile"):
+    factory.addStep(SetProperty(name="Makefile_isready",
+                                command=["sh", "-c",
+                                         "test -e " + makefile + "&& echo OK"],
+                                flunkOnFailure=False,
+                                property="exists_Makefile"))
 
 # Factories
 def AddGitLLVMClang(factory, isLLVM, isClang, repo, ref):
@@ -207,7 +217,8 @@ def get_builders():
     AddGitLLVMClang(factory, True, False,
                     '/var/cache/llvm-project.git',
                     '/var/cache/llvm-project.git')
-    AddCMake(factory, clang_not_ready)
+    CheckMakefile(factory)
+    AddCMake(factory, Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j4", "-k", "check.deps"],
             name            = 'build_llvm'))
@@ -227,7 +238,8 @@ def get_builders():
     AddGitLLVMClang(factory, False, True,
                     '/var/cache/llvm-project.git',
                     '/var/cache/llvm-project.git')
-    AddCMake(factory, clang_not_ready)
+    CheckMakefile(factory)
+    AddCMake(factory, Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j4", "-k", "clang-test.deps"],
             locks           = [centos5_lock.access('counting')],
@@ -384,12 +396,13 @@ def get_builders():
     AddGitLLVMClang(factory, False, True,
                     'chapuni@192.168.1.193:/var/cache/llvm-project.git',
                     '/cygdrive/d/llvm-project.git')
+    CheckMakefile(factory)
     PatchLLVM(factory, "llvm.patch")
     factory.addStep(ShellCommand(command=["../llvm-project/llvm/configure",
                                           "-C",
                                           "--enable-shared",
                                           "--enable-optimized"],
-                                 doStepIf=clang_not_ready))
+                                 doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
@@ -434,11 +447,12 @@ def get_builders():
     AddGitLLVMClang(factory, False, True,
                     'chapuni@192.168.1.193:/var/cache/llvm-project.git',
                     '/home/chapuni/llvm-project.git')
+    CheckMakefile(factory)
     factory.addStep(ShellCommand(command=["../llvm-project/llvm/configure",
                                           "-C",
                                           "--build=ppc-redhat-linux",
                                           "--enable-optimized"],
-                                 doStepIf=clang_not_ready))
+                                  doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
