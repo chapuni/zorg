@@ -174,7 +174,8 @@ def AddGitWin7(factory):
                                  workdir="llvm-project"))
 
 def AddCMake(factory, doStepIf=None):
-    factory.addStep(ShellCommand(description="configuring CMake",
+    factory.addStep(ShellCommand(name="CMake",
+                                 description="configuring CMake",
                                  descriptionDone="CMake",
                                  command=["/home/chapuni/BUILD/cmake-2.8.2/bin/cmake",
                                           "-DLLVM_TARGETS_TO_BUILD=all",
