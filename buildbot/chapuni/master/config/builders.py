@@ -362,7 +362,8 @@ def get_builders():
     PatchLLVM(factory, "llvm.patch")
     factory.addStep(ShellCommand(command=["../llvm-project/llvm/configure",
                                           "-C",
-                                          "--enable-shared",
+                                          #"--enable-shared",
+                                          "LIBS=/usr/lib/gcc/i686-pc-cygwin/4.3.4/libstdc++.a",
                                           "--enable-optimized"],
                                  doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
@@ -378,8 +379,8 @@ def get_builders():
     factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"]))
 
     # Build plugin manually
-    factory.addStep(Compile(command=["make", "OPTIONAL_DIRS=Hello",
-                                     "-C", "lib/Transforms"]))
+    # factory.addStep(Compile(command=["make", "OPTIONAL_DIRS=Hello",
+    #                                  "-C", "lib/Transforms"]))
 
     # XXX
     factory.addStep(ShellCommand(command=["sh", "-c",
