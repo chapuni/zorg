@@ -14,7 +14,7 @@ def Tcmake(l):
 def Tllvmlib(l):
     return filter_t(l, r'^llvm/(include|lib|tools|utils)/')
 def Fllvmtest(l): return filter_f(l, r'^llvm/test/.+/')
-def Fhtml(l): return filter_f(l, r'\.html$')
+def Fhtml(l): return filter_f(l, r'\.html(\.\w)?$')
 
 def filter_llvm(change):
     return len(Tllvm(getattr(change, "files"))) > 0
@@ -28,7 +28,7 @@ change_llvm_master = ChangeFilter(filter_fn = filter_cmake_llvm,
                                   branch=['master'])
 
 def filter_llvmclang(change):
-    l = getattr(change, "files")
+    l = Fhtml(getattr(change, "files"))
     return len(Tclang(l) + Tllvm(l)) > 0
 
 def filter_cmake_llvmclang(change):
