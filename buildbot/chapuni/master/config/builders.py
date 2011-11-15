@@ -145,19 +145,41 @@ def AddGitWin7(factory):
                                  doStepIf=clang_not_ready,
                                  workdir="llvm-project"))
 
-def AddCMake(factory, doStepIf=None):
+def AddCMake(factory, G,
+             source="../llvm-project/llvm",
+             prefix="install",
+             doStepIf=True,
+             **kwargs):
+    cmd = ["cmake", "-G"+G]
+    cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
+    for i in sorted(kwargs.items()):
+        cmd.append("-D%s=%s" % i)
+    cmd.append(source)
     factory.addStep(ShellCommand(name="CMake",
                                  description="configuring CMake",
                                  descriptionDone="CMake",
-                                 command=["/home/chapuni/BUILD/cmake-2.8.2/bin/cmake",
-                                          "-DLLVM_TARGETS_TO_BUILD=all",
-                                          "-DCMAKE_C_COMPILER=/usr/bin/gcc44",
-                                          "-DCMAKE_CXX_COMPILER=/usr/bin/g++44",
-                                          "-DLLVM_LIT_ARGS=-v -j4",
-                                          "-DCMAKE_BUILD_TYPE=Release",
-                                          "-DHAVE_NEARBYINTF=1",
-                                          "../llvm-project/llvm"],
+                                 command=cmd,
                                  doStepIf=doStepIf))
+
+def AddCMakeCentOS5(factory,
+                    LLVM_TARGETS_TO_BUILD="all",
+                    **kwargs):
+    AddCMake(factory, "Unix Makefiles",
+             CMAKE_COLOR_MAKEFILE="OFF",
+             CMAKE_C_COMPILER="/usr/bin/gcc44",
+             CMAKE_CXX_COMPILER="/usr/bin/g++44",
+             CMAKE_BUILD_TYPE="Release",
+             LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
+             LLVM_LIT_ARGS="-v -j4",
+             HAVE_NEARBYINTF=1,
+             **kwargs)
+
+def AddCMakeDOS(factory, G, **kwargs):
+    AddCMake(factory, G,
+             LLVM_TARGETS_TO_BUILD="all",
+             LLVM_LIT_ARGS="-v -j1",
+             LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
+             **kwargs)
 
 def PatchLLVM(factory, name):
     factory.addStep(ShellCommand(descriptionDone="LLVM Local Patch",
@@ -180,7 +202,7 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     CheckMakefile(factory)
-    AddCMake(factory, Makefile_not_ready)
+    AddCMakeCentOS5(factory, doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j4", "-k", "check.deps"],
             name            = 'build_llvm'))
@@ -202,7 +224,7 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     CheckMakefile(factory)
-    AddCMake(factory, Makefile_not_ready)
+    AddCMakeCentOS5(factory, doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j4", "-k", "clang-test.deps"],
             locks           = [centos5_lock.access('counting')],
@@ -226,18 +248,9 @@ def get_builders():
                    '/var/cache/llvm-project.git')
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
-    factory.addStep(ShellCommand(name="CMake",
-                                 description="configuring CMake",
-                                 descriptionDone="CMake",
-                                 command=["/home/chapuni/BUILD/cmake-2.8.2/bin/cmake",
-                                          WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/builds/install/stage1"),
-                                          "-DLLVM_TARGETS_TO_BUILD=X86",
-                                          "-DCMAKE_C_COMPILER=/usr/bin/gcc44",
-                                          "-DCMAKE_CXX_COMPILER=/usr/bin/g++44",
-                                          "-DLLVM_LIT_ARGS=-v -j4",
-                                          "-DCMAKE_BUILD_TYPE=Release",
-                                          "-DHAVE_NEARBYINTF=1",
-                                          "../llvm-project/llvm"]))
+    AddCMakeCentOS5(factory,
+                    LLVM_TARGETS_TO_BUILD="X86",
+                    prefix="builds/install/stage1")
     factory.addStep(Compile(name="stage1_build",
                             command=["make", "-j4", "-l4.2", "-k"]))
     factory.addStep(ClangTestCommand(
@@ -482,18 +495,11 @@ def get_builders():
     factory = BuildFactory()
     AddGitWin7(factory)
 #    PatchLLVM(factory, "llvm.patch")
-    factory.addStep(ShellCommand(name="CMake",
-                                 description="configuring CMake",
-                                 descriptionDone="CMake",
-                                 command=["cmake",
-                                          "-GMSYS Makefiles",
-                                          "-DCMAKE_BUILD_TYPE=Release",
-                                          "-DCMAKE_COLOR_MAKEFILE=OFF",
-                                          "-DLLVM_TARGETS_TO_BUILD=all",
-                                          "-DLLVM_LIT_ARGS=-v -j1",
-                                          "-DLLVM_LIT_TOOLS_DIR=D:/gnuwin32/bin",
-                                          "../llvm-project/llvm"],
-                                 doStepIf=clang_not_ready))
+    CheckMakefile(factory)
+    AddCMakeDOS(factory, "MSYS Makefiles",
+                CMAKE_BUILD_TYPE="Release",
+                CMAKE_COLOR_MAKEFILE="OFF",
+                doStepIf=Makefile_not_ready)
     factory.addStep(Compile(command=["make", "-j1", "-k"]))
     factory.addStep(ClangTestCommand(name="test_clang",
                          command=["make", "-j1", "clang-test"]))
@@ -508,16 +514,9 @@ def get_builders():
     factory = BuildFactory()
     AddGitWin7(factory)
 #    PatchLLVM(factory, "llvm.patch")
-    factory.addStep(ShellCommand(name="CMake",
-                                 description="configuring CMake",
-                                 descriptionDone="CMake",
-                                 command=["cmake",
-                                          "-GVisual Studio 10",
-                                          "-DLLVM_TARGETS_TO_BUILD=all",
-                                          "-DLLVM_LIT_ARGS=-v -j1",
-                                          "-DLLVM_LIT_TOOLS_DIR=D:/gnuwin32/bin",
-                                          "../llvm-project/llvm"],
-                                 doStepIf=clang_not_ready))
+    CheckMakefile(factory, makefile="LLVM.sln")
+    AddCMakeDOS(factory, "Visual Studio 10",
+                doStepIf=Makefile_not_ready)
     factory.addStep(Compile(name="all_build",
                             haltOnFailure = False,
                             flunkOnFailure=False,
