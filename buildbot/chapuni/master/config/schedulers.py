@@ -65,7 +65,7 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="stable",
         change_filter = change_llvmclang,
-        treeStableTimer=600,
+        treeStableTimer=30 * 60,
         builderNames=["cmake-clang-i686-msys",
                       "clang-i686-msys",
                       "clang-i686-cygwin",
