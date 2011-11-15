@@ -13,7 +13,7 @@ from buildbot.steps.slave import RemoveDirectory
 
 from buildbot.config import BuilderConfig
 
-from zorg.buildbot.commands.ClangTestCommand import ClangTestCommand
+from zorg.buildbot.commands.LitTestCommand import LitTestCommand
 
 def clang_not_ready(step):
     return step.build.getProperty("clang_CMakeLists") != "CMakeLists.txt"
@@ -206,7 +206,7 @@ def get_builders():
     factory.addStep(Compile(
             command         = ["make", "-j4", "-k", "check.deps"],
             name            = 'build_llvm'))
-    factory.addStep(ClangTestCommand(
+    factory.addStep(LitTestCommand(
             name            = 'test_llvm',
             command         = ["make", "-j4", "check"],
             description     = ["testing", "llvm"],
@@ -229,7 +229,7 @@ def get_builders():
             command         = ["make", "-j4", "-k", "clang-test.deps"],
             locks           = [centos5_lock.access('counting')],
             name            = 'build_clang'))
-    factory.addStep(ClangTestCommand(
+    factory.addStep(LitTestCommand(
             name            = 'test_clang',
             locks           = [centos5_lock.access('counting')],
             command         = ["make", "-j4", "clang-test"],
@@ -253,13 +253,13 @@ def get_builders():
                     prefix="builds/install/stage1")
     factory.addStep(Compile(name="stage1_build",
                             command=["make", "-j4", "-l4.2", "-k"]))
-    factory.addStep(ClangTestCommand(
+    factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
             command         = ["make", "-j4", "-k", "check"],
             locks           = [centos5_lock.access('counting')],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
-    factory.addStep(ClangTestCommand(
+    factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "-j4", "-k", "clang-test"],
             locks           = [centos5_lock.access('counting')],
@@ -283,16 +283,16 @@ def get_builders():
     factory.addStep(Compile(name="stage2_build",
                             command=["make", "VERBOSE=1", "-k", "-j4", "-l4.2"],
                             workdir="builds/stagen"))
-    factory.addStep(ClangTestCommand(name="stage2_test_clang",
-                         locks=[centos5_lock.access('counting')],
-                         command=["make", "TESTARGS=-v -j4",
-                                  "-C", "tools/clang/test"],
-                         workdir="builds/stagen"))
-    factory.addStep(ClangTestCommand(name="stage2_test_llvm",
-                         locks=[centos5_lock.access('counting')],
-                         command=["make", "LIT_ARGS=-v -j4",
-                                  "check"],
-                         workdir="builds/stagen"))
+    factory.addStep(LitTestCommand(
+            name="stage2_test_clang",
+            locks=[centos5_lock.access('counting')],
+            command=["make", "TESTARGS=-v -j4", "-C", "tools/clang/test"],
+            workdir="builds/stagen"))
+    factory.addStep(LitTestCommand(
+            name="stage2_test_llvm",
+            locks=[centos5_lock.access('counting')],
+            command=["make", "LIT_ARGS=-v -j4", "check"],
+            workdir="builds/stagen"))
     factory.addStep(Compile(name="stage2_install",
                             command=["make", "VERBOSE=1", "install", "-j4"],
                             workdir="builds/stagen"))
@@ -322,16 +322,16 @@ def get_builders():
     factory.addStep(Compile(name="stage3_build",
                             command=["make", "VERBOSE=1", "-k", "-j4", "-l4.2"],
                             workdir="builds/stagen"))
-    factory.addStep(ClangTestCommand(name="stage3_test_clang",
-                         locks=[centos5_lock.access('counting')],
-                         command=["make", "TESTARGS=-v -j4",
-                                  "-C", "tools/clang/test"],
-                         workdir="builds/stagen"))
-    factory.addStep(ClangTestCommand(name="stage3_test_llvm",
-                         locks=[centos5_lock.access('counting')],
-                         command=["make", "LIT_ARGS=-v -j4",
-                                  "check"],
-                         workdir="builds/stagen"))
+    factory.addStep(LitTestCommand(
+            name="stage3_test_clang",
+            locks=[centos5_lock.access('counting')],
+            command=["make", "TESTARGS=-v -j4", "-C", "tools/clang/test"],
+            workdir="builds/stagen"))
+    factory.addStep(LitTestCommand(
+            name="stage3_test_llvm",
+            locks=[centos5_lock.access('counting')],
+            command=["make", "LIT_ARGS=-v -j4", "check"],
+            workdir="builds/stagen"))
     factory.addStep(Compile(name="stage3_install",
                             command=["make", "VERBOSE=1", "install", "-j4"],
                             workdir="builds/stagen"))
@@ -403,12 +403,12 @@ def get_builders():
                                           "for x in Release*/bin; do mkdir xxx;mv -v $x/* xxx;cp -v xxx/* $x;rm -rf xxx; done"],
                                  workdir="build"))
 
-    factory.addStep(ClangTestCommand(name="test_clang",
-                         command=["make", "TESTARGS=-v -j1",
-                                  "-C", "tools/clang/test"]))
-    factory.addStep(ClangTestCommand(name="test_llvm",
-                         command=["make", "LIT_ARGS=-v -j1",
-                                  "check"]))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["make", "LIT_ARGS=-v -j1", "check"]))
     yield BuilderConfig(name="clang-i686-cygwin",
                         mergeRequests=True,
                         slavenames=["cygwin"],
@@ -449,9 +449,9 @@ def get_builders():
                                  flunkOnWarnings=False,
                                  command=["make", "TESTARGS=-v",
                                           "-C", "tools/clang/test"]))
-    factory.addStep(ClangTestCommand(name="test_llvm",
-                         command=["make", "LIT_ARGS=-v",
-                                  "check"]))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["make", "LIT_ARGS=-v", "check"]))
     yield BuilderConfig(name="clang-ppc-linux",
                         mergeRequests=True,
                         slavenames=["ps3-f12"],
@@ -480,12 +480,12 @@ def get_builders():
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
     factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"]))
-    factory.addStep(ClangTestCommand(name="test_clang",
-                         command=["make", "TESTARGS=-v -j1",
-                                  "-C", "tools/clang/test"]))
-    factory.addStep(ClangTestCommand(name="test_llvm",
-                         command=["make", "LIT_ARGS=-v -j1",
-                                  "check"]))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["make", "LIT_ARGS=-v -j1", "check"]))
     yield BuilderConfig(name="clang-i686-msys",
                         mergeRequests=True,
                         slavenames=["win7"],
@@ -501,10 +501,12 @@ def get_builders():
                 CMAKE_COLOR_MAKEFILE="OFF",
                 doStepIf=Makefile_not_ready)
     factory.addStep(Compile(command=["make", "-j1", "-k"]))
-    factory.addStep(ClangTestCommand(name="test_clang",
-                         command=["make", "-j1", "clang-test"]))
-    factory.addStep(ClangTestCommand(name="test_llvm",
-                         command=["make", "-j1", "check"]))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            command=["make", "-j1", "clang-test"]))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["make", "-j1", "check"]))
     yield BuilderConfig(name="cmake-clang-i686-msys",
                         mergeRequests=True,
                         slavenames=["win7"],
@@ -531,20 +533,22 @@ def get_builders():
                                      "-v:m",
                                      "-p:Configuration=Release",
                                      "LLVM.sln"]))
-    factory.addStep(ClangTestCommand(name="test_clang",
-                         command=["c:/Python27/python.exe",
-                                  "../llvm-project/llvm/utils/lit/lit.py",
-                                  "--param", "build_config=Release",
-                                  "--param", "build_mode=Release",
-                                  "-v", "-j1",
-                                  "tools/clang/test"]))
-    factory.addStep(ClangTestCommand(name="test_llvm",
-                         command=["c:/Python27/python.exe",
-                                  "../llvm-project/llvm/utils/lit/lit.py",
-                                  "--param", "build_config=Release",
-                                  "--param", "build_mode=Release",
-                                  "-v", "-j1",
-                                  "test"]))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=Release",
+                     "--param", "build_mode=Release",
+                     "-v", "-j1",
+                     "tools/clang/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=Release",
+                     "--param", "build_mode=Release",
+                     "-v", "-j1",
+                     "test"]))
     yield BuilderConfig(name="cmake-clang-i686-msvc10",
                         mergeRequests=True,
                         slavenames=["win7"],
