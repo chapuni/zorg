@@ -454,9 +454,10 @@ def get_builders():
                                 command=["sh", "-c", "PWD= sh pwd"],
                                 workdir=".",
                                 property="workdir_msys"))
+    CheckMakefile(factory)
     factory.addStep(ShellCommand(command=["sh", "-c",
-                                          "PATH=/bin:$PATH PWD=/e/bb-win7/clang-i686-msys/build /e/bb-win7/clang-i686-msys/llvm-project/llvm/configure -C --enable-optimized"],
-                                 doStepIf=clang_not_ready))
+                                          WithProperties("PATH=/bin:$PATH PWD=%(workdir_msys)s/build %(workdir_msys)s/llvm-project/llvm/configure -C --enable-optimized")],
+                                 doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["sh", "-c",
                                           "./config.status --recheck"],
                                  doStepIf=sample_needed_update,
