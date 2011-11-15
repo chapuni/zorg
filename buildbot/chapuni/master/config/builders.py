@@ -450,6 +450,10 @@ def get_builders():
     PatchLLVM(factory, "makefile.patch")
 #    PatchLLVM(factory, "llvm.patch")
     PatchClang(factory, "clang.patch")
+    factory.addStep(SetProperty(name="get_msys_path",
+                                command=["sh", "-c", "PWD= sh pwd"],
+                                workdir=".",
+                                property="workdir_msys"))
     factory.addStep(ShellCommand(command=["sh", "-c",
                                           "PATH=/bin:$PATH PWD=/e/bb-win7/clang-i686-msys/build /e/bb-win7/clang-i686-msys/llvm-project/llvm/configure -C --enable-optimized"],
                                  doStepIf=clang_not_ready))
