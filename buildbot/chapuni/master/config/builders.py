@@ -429,8 +429,11 @@ def get_builders():
     CheckMakefile(factory)
     factory.addStep(ShellCommand(command=["../llvm-project/llvm/configure",
                                           "-C",
-                                          "--build=ppc-redhat-linux",
-                                          "--enable-optimized"],
+                                          "CC=ccache gcc",
+                                          "CXX=ccache g++",
+                                          "--enable-optimized",
+                                          "--with-optimize-option=-O3 -UPPC",
+                                          "--build=ppc-redhat-linux"],
                                   doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
                                  doStepIf=sample_needed_update,
@@ -440,7 +443,6 @@ def get_builders():
                                  workdir="build/projects/sample"))
     factory.addStep(Compile(command=["make",
                                      "VERBOSE=1",
-                                     "OPTIMIZE_OPTION=-O3 -UPPC",
                                      "-k",
                                      ]))
     factory.addStep(ShellCommand(name="test_clang",
