@@ -193,6 +193,7 @@ def get_builders():
                         slavenames=["centos5"],
                         mergeRequests=False,
                         locks=[centos5_lock.access('counting')],
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.2/bin:${PATH}'},
                         factory=factory)
 
     # CentOS5(clang only)
@@ -215,6 +216,7 @@ def get_builders():
     yield BuilderConfig(name="cmake-clang-x86_64-linux",
                         slavenames=["centos5"],
                         mergeRequests=False,
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.2/bin:${PATH}'},
                         factory=factory)
 
     # CentOS5(3stage)
@@ -350,6 +352,7 @@ def get_builders():
     yield BuilderConfig(name="clang-3stage-x86_64-linux",
                         slavenames=["centos5"],
                         mergeRequests=True,
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.2/bin:${PATH}'},
                         factory=factory)
 
     # Cygwin
