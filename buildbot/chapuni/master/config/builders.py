@@ -181,44 +181,57 @@ def AddCMakeDOS(factory, G, **kwargs):
              LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
              **kwargs)
 
-def BuildStageN(factory, prev, targ):
-    factory.addStep(ShellCommand(command=[WithProperties("%(workdir)s/llvm-project/llvm/configure"),
-                                          WithProperties("CC=%%(workdir)s/builds/install/stage%d/bin/clang -std=gnu89" % prev),
-                                          WithProperties("CXX=%%(workdir)s/builds/install/stage%d/bin/clang++" % prev),
-                                          WithProperties("--prefix=%(workdir)s/builds/install/stagen"),
-                                          "--disable-timestamps",
-                                          "--disable-assertions",
-                                          "--enable-optimized"],
-                                 name="configure",
-                                 description="configuring",
-                                 descriptionDone="Configure",
-                                 workdir="builds/stagen"))
-    factory.addStep(Compile(name="build",
-                            command=["make", "VERBOSE=1", "-k", "-j4", "-l4.2"],
-                            workdir="builds/stagen"))
+def BuildStageN(factory, n,
+                root="builds"):
+    instroot="%s/install" % root
+    workdir="%s/stagen" % root
+    tools="%s/stage%d/bin" % (instroot, n - 1)
+    tmpinst="%s/stagen" % instroot
+    factory.addStep(ShellCommand(
+            command=[
+                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                WithProperties("CC=%%(workdir)s/%s/clang -std=gnu89" % tools),
+                WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
+                WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
+                "--disable-timestamps",
+                "--disable-assertions",
+                "--enable-optimized"],
+            name="configure",
+            description="configuring",
+            descriptionDone="Configure",
+            workdir=workdir))
+    factory.addStep(Compile(
+            name="build",
+            command=["make", "VERBOSE=1", "-k", "-j4", "-l4.2"],
+            workdir=workdir))
     factory.addStep(LitTestCommand(
             name="test_clang",
             locks=[centos5_lock.access('counting')],
             command=["make", "TESTARGS=-v -j4", "-C", "tools/clang/test"],
-            workdir="builds/stagen"))
+            workdir=workdir))
     factory.addStep(LitTestCommand(
             name="test_llvm",
             locks=[centos5_lock.access('counting')],
             command=["make", "LIT_ARGS=-v -j4", "check"],
-            workdir="builds/stagen"))
-    factory.addStep(Compile(name="install",
-                            command=["make", "VERBOSE=1", "install", "-j4"],
-                            workdir="builds/stagen"))
-    factory.addStep(ShellCommand(name="install_fix",
-                                 command=["mv", "-v",
-                                          "stagen",
-                                          "stage%d" % targ],
-                                 workdir="builds/install"))
-    factory.addStep(ShellCommand(name="builddir_fix",
-                                 command=["mv", "-v",
-                                          "stagen",
-                                          "stage%d" % targ],
-                                 workdir="builds"))
+            workdir=workdir))
+    factory.addStep(Compile(
+            name="install",
+            command=["make", "VERBOSE=1", "install", "-j4"],
+            workdir=workdir))
+    factory.addStep(ShellCommand(
+            name="install_fix",
+            command=[
+                "mv", "-v",
+                tmpinst,
+                "%s/stage%d" % (instroot, n)],
+            workdir="."))
+    factory.addStep(ShellCommand(
+            name="builddir_fix",
+            command=[
+                "mv", "-v",
+                workdir,
+                "%s/stage%d" % (root, n)],
+            workdir="."))
 
 def PatchLLVM(factory, name):
     factory.addStep(ShellCommand(descriptionDone="LLVM Local Patch",
@@ -308,11 +321,12 @@ def get_builders():
                             command=["make", "install", "-k", "-j4"]))
 
     # stage 2
-    BuildStageN(factory, 1, 2)
+    BuildStageN(factory, 2)
 
     # stage 3
-    BuildStageN(factory, 2, 3)
+    BuildStageN(factory, 3)
 
+    # Trail
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
                                     flunkOnFailure=False))
     factory.addStep(ShellCommand(name="save_builds",
