@@ -311,6 +311,8 @@ def get_builders():
             locks           = [centos5_lock.access('counting')],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+                                    flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "-j4", "-k", "clang-test"],
@@ -385,6 +387,8 @@ def get_builders():
                                           "for x in Release*/bin; do mkdir xxx;mv -v $x/* xxx;cp -v xxx/* $x;rm -rf xxx; done"],
                                  workdir="build"))
 
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+                                    flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
             command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"]))
@@ -427,6 +431,8 @@ def get_builders():
                                      "VERBOSE=1",
                                      "-k",
                                      ]))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+                                    flunkOnFailure=False))
     factory.addStep(ShellCommand(name="test_clang",
                                  flunkOnFailure=False,
                                  warnOnWarnings=False,
@@ -464,6 +470,8 @@ def get_builders():
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
     factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"]))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+                                    flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
             command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"]))
@@ -485,6 +493,8 @@ def get_builders():
                 CMAKE_COLOR_MAKEFILE="OFF",
                 doStepIf=Makefile_not_ready)
     factory.addStep(Compile(command=["make", "-j1", "-k"]))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+                                    flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
             command=["make", "-j1", "clang-test"]))
@@ -517,6 +527,8 @@ def get_builders():
                                      "-v:m",
                                      "-p:Configuration=Release",
                                      "LLVM.sln"]))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+                                    flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
             command=["c:/Python27/python.exe",
