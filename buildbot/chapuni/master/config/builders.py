@@ -177,7 +177,7 @@ def AddCMakeCentOS5(factory,
 def AddCMakeDOS(factory, G, **kwargs):
     AddCMake(factory, G,
              LLVM_TARGETS_TO_BUILD="all",
-             LLVM_LIT_ARGS="-v -j1",
+             LLVM_LIT_ARGS="-v",
              LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
              **kwargs)
 
@@ -452,7 +452,7 @@ def get_builders():
     AddGitWin7(factory)
     PatchLLVM(factory, "makefile.patch")
 #    PatchLLVM(factory, "llvm.patch")
-    PatchClang(factory, "clang.patch")
+#    PatchClang(factory, "clang.patch")
     factory.addStep(SetProperty(name="get_msys_path",
                                 command=["sh", "-c", "PWD= sh pwd"],
                                 workdir=".",
@@ -474,10 +474,10 @@ def get_builders():
                                     flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
-            command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"]))
+            command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
-            command=["make", "LIT_ARGS=-v -j1", "check"]))
+            command=["make", "LIT_ARGS=-v -j8", "check"]))
     yield BuilderConfig(name="clang-i686-msys",
                         mergeRequests=True,
                         slavenames=["win7"],
@@ -486,7 +486,7 @@ def get_builders():
     # cmake-msys
     factory = BuildFactory()
     AddGitWin7(factory)
-#    PatchLLVM(factory, "llvm.patch")
+    PatchLLVM(factory, "llvm.patch")
     CheckMakefile(factory)
     AddCMakeDOS(factory, "MSYS Makefiles",
                 CMAKE_BUILD_TYPE="Release",
@@ -509,7 +509,7 @@ def get_builders():
     # MSVC10
     factory = BuildFactory()
     AddGitWin7(factory)
-#    PatchLLVM(factory, "llvm.patch")
+    PatchLLVM(factory, "llvm.patch")
     CheckMakefile(factory, makefile="LLVM.sln")
     AddCMakeDOS(factory, "Visual Studio 10",
                 doStepIf=Makefile_not_ready)
@@ -535,7 +535,7 @@ def get_builders():
                      "../llvm-project/llvm/utils/lit/lit.py",
                      "--param", "build_config=Release",
                      "--param", "build_mode=Release",
-                     "-v", "-j1",
+                     "-v",
                      "tools/clang/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
@@ -543,7 +543,7 @@ def get_builders():
                      "../llvm-project/llvm/utils/lit/lit.py",
                      "--param", "build_config=Release",
                      "--param", "build_mode=Release",
-                     "-v", "-j1",
+                     "-v",
                      "test"]))
     yield BuilderConfig(name="cmake-clang-i686-msvc10",
                         mergeRequests=True,
