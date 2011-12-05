@@ -148,10 +148,13 @@ def AddGitWin7(factory):
 def AddCMake(factory, G,
              source="../llvm-project/llvm",
              prefix="install",
+             buildClang=False,
              doStepIf=True,
              **kwargs):
     cmd = ["cmake", "-G"+G]
     cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
+    if buildClang:
+        cmd.append("-DLLVM_CLANG_SOURCE_DIR=%s/../clang" % source)
     for i in sorted(kwargs.items()):
         cmd.append("-D%s=%s" % i)
     cmd.append(source)
@@ -193,6 +196,7 @@ def BuildStageN(factory, n,
                 WithProperties("CC=%%(workdir)s/%s/clang -std=gnu89" % tools),
                 WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
                 WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
+                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "--disable-timestamps",
                 "--disable-assertions",
                 "--enable-optimized"],
@@ -254,7 +258,7 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     CheckMakefile(factory)
-    AddCMakeCentOS5(factory, doStepIf=Makefile_not_ready)
+    AddCMakeCentOS5(factory, buildClang=False, doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j4", "-k", "check.deps"],
             name            = 'build_llvm'))
@@ -272,11 +276,11 @@ def get_builders():
 
     # CentOS5(clang only)
     factory = BuildFactory()
-    AddGitLLVMTree(factory, True,
+    AddGitLLVMTree(factory, False,
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     CheckMakefile(factory)
-    AddCMakeCentOS5(factory, doStepIf=Makefile_not_ready)
+    AddCMakeCentOS5(factory, buildClang=True, doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j4", "-k", "clang-test.deps"],
             locks           = [centos5_lock.access('counting')],
@@ -295,13 +299,14 @@ def get_builders():
 
     # CentOS5(3stage)
     factory = BuildFactory()
-    AddGitLLVMTree(factory, True,
+    AddGitLLVMTree(factory, False,
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
     AddCMakeCentOS5(factory,
                     LLVM_TARGETS_TO_BUILD="X86",
+                    buildClang=True,
                     prefix="builds/install/stage1")
     factory.addStep(Compile(name="stage1_build",
                             command=["make", "-j4", "-l4.2", "-k"]))
@@ -355,17 +360,20 @@ def get_builders():
     # Cygwin
     factory = BuildFactory()
     # check out the source
-    AddGitLLVMTree(factory, True,
+    AddGitLLVMTree(factory, False,
                     'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
                     '/cygdrive/d/llvm-project.git')
     CheckMakefile(factory)
     PatchLLVM(factory, "llvm.patch")
-    factory.addStep(ShellCommand(command=["../llvm-project/llvm/configure",
-                                          "-C",
-                                          #"--enable-shared",
-                                          "LIBS=/usr/lib/gcc/i686-pc-cygwin/4.3.4/libstdc++.a",
-                                          "--enable-optimized"],
-                                 doStepIf=Makefile_not_ready))
+    factory.addStep(ShellCommand(
+            command=[
+                "../llvm-project/llvm/configure",
+                "-C",
+                #"--enable-shared",
+                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "LIBS=/usr/lib/gcc/i686-pc-cygwin/4.3.4/libstdc++.a",
+                "--enable-optimized"],
+            doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
@@ -409,18 +417,21 @@ def get_builders():
                                           "fetch", "origin", "--prune"],
                                  timeout=3600,
                                  flunkOnFailure=False));
-    AddGitLLVMTree(factory, True,
+    AddGitLLVMTree(factory, False,
                    'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
                    '/home/chapuni/llvm-project.git')
     CheckMakefile(factory)
-    factory.addStep(ShellCommand(command=["../llvm-project/llvm/configure",
-                                          "-C",
-                                          "CC=ccache gcc",
-                                          "CXX=ccache g++",
-                                          "--enable-optimized",
-                                          "--with-optimize-option=-O3 -UPPC",
-                                          "--build=ppc-redhat-linux"],
-                                  doStepIf=Makefile_not_ready))
+    factory.addStep(ShellCommand(
+            command=[
+                "../llvm-project/llvm/configure",
+                "-C",
+                "CC=ccache gcc",
+                "CXX=ccache g++",
+                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "--enable-optimized",
+                "--with-optimize-option=-O3 -UPPC",
+                "--build=ppc-redhat-linux"],
+            doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
