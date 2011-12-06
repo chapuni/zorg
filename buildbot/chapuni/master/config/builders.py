@@ -40,7 +40,7 @@ def CheckMakefile(factory, makefile="Makefile"):
                                 property="exists_Makefile"))
 
 # Factories
-def AddGitLLVMTree(factory, isClang, repo, ref):
+def AddGitLLVMTree(factory, repo, ref):
     factory.addStep(Git(repourl=repo,
                         reference=ref,
                         timeout=3600,
@@ -53,102 +53,32 @@ def AddGitLLVMTree(factory, isClang, repo, ref):
                                           "clean",
                                           "-fx"],
                                  workdir="llvm-project"))
-    if isClang:
-        factory.addStep(ShellCommand(command=["ln",
-                                              "-svf",
-                                              "../../clang", "llvm/tools/."],
-                                     workdir="llvm-project"))
+
+def AddGitFetch(factory, ref, locks=[]):
+    factory.addStep(ShellCommand(
+            name="git-fetch",
+            command=[
+                "git",
+                "--git-dir", ref,
+                "fetch",
+                "--prune"],
+            locks=locks,
+            flunkOnFailure=False));
 
 def AddGitWin7(factory):
-    factory.addStep(ShellCommand(name="git-fetch",
-                                 command=["git",
-                                          "--git-dir", "D:/llvm-project.git",
-                                          "fetch", "--prune"],
-                                 locks=[win7_git_lock.access('counting')],
-                                 flunkOnFailure=False));
-    factory.addStep(Git(name="update_llvm_project",
-                        repourl='chapuni@192.168.1.193:/var/cache/llvm-project-subm.git',
-                        reference='d:/llvm-project.git',
-                        workdir='llvm-project'))
-    factory.addStep(SetProperty(name="got_revision",
-                                command=["git", "describe", "--tags"],
-                                workdir="llvm-project",
-                                property="got_revision"))
-    factory.addStep(ShellCommand(name="clean_submodule",
-                                 command=["git",
-                                          "submodule",
-                                          "foreach",
-                                          "git checkout -f; git clean -fx"],
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(name="update_submodule",
-                                 command=["git",
-                                          "submodule",
-                                          "update"],
-                                 haltOnFailure = True,
-                                 workdir="llvm-project"))
-    factory.addStep(SetProperty(name="llvm_submodule_isready",
-                                command=["git",
-                                         "--git-dir", "llvm/tools/clang/.git",
-                                         "ls-tree",
-                                         "--name-only",
-                                         "HEAD", "CMakeLists.txt"],
-                                workdir="llvm-project",
-                                flunkOnFailure=False,
-                                property="clang_CMakeLists"))
-    factory.addStep(ShellCommand(name="llvm_submodule_update",
-                                 command=["git",
-                                          "submodule",
-                                          "update",
-                                          "--init",
-                                          "--reference",
-                                          "d:/llvm-project.git",
-                                          "llvm"],
-                                 haltOnFailure = True,
-                                 doStepIf=clang_not_ready,
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(name="clang_git_clone",
-                                 command=["git",
-                                          "clone",
-                                          "-n",
-                                          "--reference",
-                                          "d:/llvm-project.git",
-                                          "http://llvm.org/git/clang.git"],
-                                 doStepIf=clang_not_ready,
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(name="clang_git_worktree",
-                                 command=["sh", "-c",
-                                          "git config core.worktree $PWD/../llvm/tools/clang"],
-                                 doStepIf=clang_not_ready,
-                                 workdir="llvm-project/clang"))
-    factory.addStep(ShellCommand(name="clang_mkdir",
-                                 command=["mkdir", "clang"],
-                                 doStepIf=clang_not_ready,
-                                 flunkOnFailure=False,
-                                 workdir="llvm-project/llvm/tools"))
-    factory.addStep(ShellCommand(name="clang_gitdir",
-                                 command=["sh", "-c",
-                                          "echo gitdir: $PWD/clang/.git > llvm/tools/clang/.git"],
-                                 doStepIf=clang_not_ready,
-                                 workdir="llvm-project"))
-    factory.addStep(ShellCommand(name="clang_git_reset",
-                                 command=["git",
-                                          "checkout",
-                                          "-f"],
-                                 doStepIf=clang_not_ready,
-                                 workdir="llvm-project/clang"))
-    factory.addStep(ShellCommand(name="clang_submodule_update",
-                                 command=["git",
-                                          "submodule",
-                                          "update", "--init",
-                                          "clang"],
-                                 haltOnFailure = True,
-                                 doStepIf=clang_not_ready,
-                                 workdir="llvm-project"))
+    AddGitFetch(
+        factory,
+        "D:/llvm-project.git",
+        [win7_git_lock.access('counting')])
+    AddGitLLVMTree(
+        factory,
+        'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
+        'D:/llvm-project.git')
 
 def AddCMake(factory, G,
              source="../llvm-project/llvm",
              prefix="install",
-             buildClang=False,
+             buildClang=True,
              doStepIf=True,
              **kwargs):
     cmd = ["cmake", "-G"+G]
@@ -250,11 +180,18 @@ def PatchClang(factory, name):
                                  flunkOnFailure=False,
                                  workdir="llvm-project/llvm/tools/clang"))
 
+def PatchLLVMClang(factory, name):
+    factory.addStep(ShellCommand(descriptionDone="llvm-project Local Patch",
+                                 command=["sh", "-c",
+                                          "patch -p1 -N < ../" + name],
+                                 flunkOnFailure=False,
+                                 workdir="llvm-project"))
+
 def get_builders():
 
     # CentOS5(llvm-x86)
     factory = BuildFactory()
-    AddGitLLVMTree(factory, False,
+    AddGitLLVMTree(factory,
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     CheckMakefile(factory)
@@ -276,11 +213,11 @@ def get_builders():
 
     # CentOS5(clang only)
     factory = BuildFactory()
-    AddGitLLVMTree(factory, False,
+    AddGitLLVMTree(factory,
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     CheckMakefile(factory)
-    AddCMakeCentOS5(factory, buildClang=True, doStepIf=Makefile_not_ready)
+    AddCMakeCentOS5(factory, doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j4", "-k", "clang-test.deps"],
             locks           = [centos5_lock.access('counting')],
@@ -299,14 +236,14 @@ def get_builders():
 
     # CentOS5(3stage)
     factory = BuildFactory()
-    AddGitLLVMTree(factory, False,
+    AddGitLLVMTree(factory,
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
+    #PatchLLVMClang(factory, "llvmclang.diff")
     AddCMakeCentOS5(factory,
                     LLVM_TARGETS_TO_BUILD="X86",
-                    buildClang=True,
                     prefix="builds/install/stage1")
     factory.addStep(Compile(name="stage1_build",
                             command=["make", "-j4", "-l4.2", "-k"]))
@@ -360,7 +297,7 @@ def get_builders():
     # Cygwin
     factory = BuildFactory()
     # check out the source
-    AddGitLLVMTree(factory, False,
+    AddGitLLVMTree(factory,
                     'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
                     '/cygdrive/d/llvm-project.git')
     CheckMakefile(factory)
@@ -417,7 +354,7 @@ def get_builders():
                                           "fetch", "origin", "--prune"],
                                  timeout=3600,
                                  flunkOnFailure=False));
-    AddGitLLVMTree(factory, False,
+    AddGitLLVMTree(factory,
                    'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
                    '/home/chapuni/llvm-project.git')
     CheckMakefile(factory)
@@ -469,9 +406,11 @@ def get_builders():
                                 workdir=".",
                                 property="workdir_msys"))
     CheckMakefile(factory)
-    factory.addStep(ShellCommand(command=["sh", "-c",
-                                          WithProperties("PATH=/bin:$PATH PWD=%(workdir_msys)s/build %(workdir_msys)s/llvm-project/llvm/configure -C --enable-optimized")],
-                                 doStepIf=Makefile_not_ready))
+    factory.addStep(ShellCommand(
+            command=[
+                "sh", "-c",
+                WithProperties("PATH=/bin:$PATH PWD=%(workdir_msys)s/build %(workdir_msys)s/llvm-project/llvm/configure -C --enable-optimized --with-clang-srcdir=%(workdir_msys)s/llvm-project/clang")],
+            doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["sh", "-c",
                                           "./config.status --recheck"],
                                  doStepIf=sample_needed_update,
@@ -497,7 +436,7 @@ def get_builders():
     # cmake-msys
     factory = BuildFactory()
     AddGitWin7(factory)
-    PatchLLVM(factory, "llvm.patch")
+    #PatchLLVM(factory, "llvm.patch")
     CheckMakefile(factory)
     AddCMakeDOS(factory, "MSYS Makefiles",
                 CMAKE_BUILD_TYPE="Release",
@@ -520,7 +459,7 @@ def get_builders():
     # MSVC10
     factory = BuildFactory()
     AddGitWin7(factory)
-    PatchLLVM(factory, "llvm.patch")
+    #PatchLLVM(factory, "llvm.patch")
     CheckMakefile(factory, makefile="LLVM.sln")
     AddCMakeDOS(factory, "Visual Studio 10",
                 doStepIf=Makefile_not_ready)
