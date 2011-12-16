@@ -308,7 +308,7 @@ def get_builders():
                 "-C",
                 #"--enable-shared",
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
-                "LIBS=/usr/lib/gcc/i686-pc-cygwin/4.3.4/libstdc++.a",
+                "LIBS=-static",
                 "--enable-optimized"],
             doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
