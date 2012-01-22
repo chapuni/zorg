@@ -167,6 +167,61 @@ def BuildStageN(factory, n,
                 "%s/stage%d" % (root, n)],
             workdir="."))
 
+def BuildStageNcyg(factory, n,
+                root="builds"):
+    instroot="%s/install" % root
+    workdir="%s/stagen" % root
+    tools="%s/stage%d/bin" % (instroot, n - 1)
+    tmpinst="%s/stagen" % instroot
+    factory.addStep(ShellCommand(
+            command=[
+                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                WithProperties("CC=%%(workdir)s/%s/clang" % tools),
+                WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
+                WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
+                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "LIBS=-static",
+                "--disable-timestamps",
+                "--disable-assertions",
+                "--enable-optimized"],
+            name="configure",
+            description="configuring",
+            descriptionDone="Configure",
+            workdir=workdir))
+    factory.addStep(Compile(name="make_quick",
+                            haltOnFailure = False,
+                            flunkOnFailure=False,
+                            command=["make", "VERBOSE=1", "-k", "-j8"],
+                            workdir=workdir))
+    factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"],
+                            workdir=workdir))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"],
+            workdir=workdir))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["make", "LIT_ARGS=-v -j1", "check"],
+            workdir=workdir))
+    factory.addStep(Compile(
+            name="install",
+            command=["make", "VERBOSE=1", "install", "-j1"],
+            workdir=workdir))
+    factory.addStep(ShellCommand(
+            name="install_fix",
+            command=[
+                "mv", "-v",
+                tmpinst,
+                "%s/stage%d" % (instroot, n)],
+            workdir="."))
+    factory.addStep(ShellCommand(
+            name="builddir_fix",
+            command=[
+                "mv", "-v",
+                workdir,
+                "%s/stage%d" % (root, n)],
+            workdir="."))
+
 def PatchLLVM(factory, name):
     factory.addStep(ShellCommand(descriptionDone="LLVM Local Patch",
                                  command=["sh", "-c",
@@ -292,6 +347,76 @@ def get_builders():
                         slavenames=["centos5"],
                         mergeRequests=True,
                         env={'PATH': '/home/chapuni/BUILD/cmake-2.8.2/bin:${PATH}'},
+                        factory=factory)
+
+    # Cygwin(3stage)
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                    'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
+                    '/cygdrive/d/llvm-project.git')
+    PatchLLVMClang(factory, "llvmclang.diff")
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+                                    flunkOnFailure=False))
+    AddCMake(factory, "Unix Makefiles",
+             LLVM_TARGETS_TO_BUILD="X86",
+             CMAKE_COLOR_MAKEFILE="OFF",
+             CMAKE_BUILD_TYPE="Release",
+             LLVM_LIT_ARGS="-v -j1",
+             CMAKE_LEGACY_CYGWIN_WIN32="0",
+#             CMAKE_EXE_LINKER_FLAGS="-Wl,--enable-auto-import /usr/lib/gcc/i686-pc-cygwin/4.3.4/libstdc++.a",
+             CMAKE_EXE_LINKER_FLAGS="-static",
+             prefix="builds/install/stage1")
+    factory.addStep(Compile(name="stage1_build_quick",
+                            haltOnFailure = False,
+                            flunkOnFailure=False,
+                            command=["make", "-j8", "-k"]))
+    factory.addStep(Compile(name="stage1_build",
+                            command=["make", "-k"]))
+    factory.addStep(LitTestCommand(
+            name            = 'stage1_test_llvm',
+            command         = ["make", "-j4", "check"],
+            description     = ["testing", "llvm"],
+            descriptionDone = ["test",    "llvm"]))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+                                    flunkOnFailure=False))
+    factory.addStep(LitTestCommand(
+            name            = 'stage1_test_clang',
+            command         = ["make", "-j4", "clang-test"],
+            flunkOnFailure  = False,
+            warnOnWarnings  = False,
+            flunkOnWarnings = False,
+            description     = ["testing", "clang"],
+            descriptionDone = ["test",    "clang"]))
+    factory.addStep(Compile(name="stage1_install",
+                            command=["make", "install", "-k", "-j4"]))
+
+    # stage 2
+    BuildStageNcyg(factory, 2)
+
+    # stage 3
+    BuildStageNcyg(factory, 3)
+
+    # Trail
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
+                                    flunkOnFailure=False))
+    factory.addStep(ShellCommand(name="save_builds",
+                                 command=["mv", "-v",
+                                          "builds",
+                                          "last"],
+                                 workdir="."))
+    factory.addStep(ShellCommand(name="compare_23",
+                                 description="Comparing",
+                                 descriptionDone="Compare-2-3",
+                                 command=["find",
+                                          "bin",
+                                          "-type", "f",
+                                          "!", "-name", "llvm-config",
+                                          "-exec",
+                                          "cmp", "../stage2/{}", "{}", ";"],
+                                 workdir="last/install/stage3"))
+    yield BuilderConfig(name="clang-3stage-cygwin",
+                        slavenames=["cygwin"],
+                        mergeRequests=True,
                         factory=factory)
 
     # Cygwin
@@ -420,8 +545,11 @@ def get_builders():
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
     factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"]))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
-                                    flunkOnFailure=False))
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
             command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"]))
@@ -443,8 +571,11 @@ def get_builders():
                 CMAKE_COLOR_MAKEFILE="OFF",
                 doStepIf=Makefile_not_ready)
     factory.addStep(Compile(command=["make", "-j1", "-k"]))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
-                                    flunkOnFailure=False))
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
             command=["make", "-j1", "clang-test"]))
@@ -477,8 +608,11 @@ def get_builders():
                                      "-v:m",
                                      "-p:Configuration=Release",
                                      "LLVM.sln"]))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
-                                    flunkOnFailure=False))
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
             command=["c:/Python27/python.exe",
