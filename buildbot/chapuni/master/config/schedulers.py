@@ -57,7 +57,7 @@ def get_schedulers():
         change_filter = change_llvmclang,
         treeStableTimer=30,
         builderNames=["cmake-clang-i686-msvc10",
-                      "clang-3stage-cygwin",
+                      #"clang-3stage-cygwin",
 ])
     yield AnyBranchScheduler(
         name="quick-llvm",
@@ -70,7 +70,7 @@ def get_schedulers():
         treeStableTimer=30 * 60,
         builderNames=["cmake-clang-i686-msys",
                       "clang-i686-msys",
-                      #"clang-i686-cygwin",
+                      "clang-3stage-cygwin",
                       "clang-ppc-linux",
                       "clang-3stage-x86_64-linux",
                       ])

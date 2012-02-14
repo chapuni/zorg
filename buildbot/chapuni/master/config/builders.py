@@ -337,12 +337,13 @@ def get_builders():
                                  description="Comparing",
                                  descriptionDone="Compare-2-3",
                                  command=["find",
-                                          "bin",
+                                          "!", "-wholename", "*/test/*",
                                           "-type", "f",
-                                          "!", "-name", "llvm-config",
+                                          "-name", "*.o",
+                                          "!", "-name", "llvm-config*",
                                           "-exec",
                                           "cmp", "../stage2/{}", "{}", ";"],
-                                 workdir="last/install/stage3"))
+                                 workdir="last/stage3"))
     yield BuilderConfig(name="clang-3stage-x86_64-linux",
                         slavenames=["centos5"],
                         mergeRequests=True,
@@ -357,15 +358,30 @@ def get_builders():
     PatchLLVMClang(factory, "llvmclang.diff")
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
-    AddCMake(factory, "Unix Makefiles",
-             LLVM_TARGETS_TO_BUILD="X86",
-             CMAKE_COLOR_MAKEFILE="OFF",
-             CMAKE_BUILD_TYPE="Release",
-             LLVM_LIT_ARGS="-v -j1",
-             CMAKE_LEGACY_CYGWIN_WIN32="0",
-#             CMAKE_EXE_LINKER_FLAGS="-Wl,--enable-auto-import /usr/lib/gcc/i686-pc-cygwin/4.3.4/libstdc++.a",
-             CMAKE_EXE_LINKER_FLAGS="-static",
-             prefix="builds/install/stage1")
+#     AddCMake(factory, "Unix Makefiles",
+#              LLVM_TARGETS_TO_BUILD="X86",
+#              CMAKE_COLOR_MAKEFILE="OFF",
+#              CMAKE_BUILD_TYPE="Release",
+#              LLVM_LIT_ARGS="-v -j1",
+#              CMAKE_LEGACY_CYGWIN_WIN32="0",
+# #             CMAKE_EXE_LINKER_FLAGS="-Wl,--enable-auto-import /usr/lib/gcc/i686-pc-cygwin/4.3.4/libstdc++.a",
+#              CMAKE_EXE_LINKER_FLAGS="-static",
+#              prefix="builds/install/stage1")
+    factory.addStep(ShellCommand(
+            command=[
+                "../llvm-project/llvm/configure",
+                "-C",
+                WithProperties("--prefix=%(workdir)s/builds/install/stage1"),
+                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "LIBS=-static",
+                "--enable-targets=x86",
+                #"--enable-shared",
+                "--with-optimize-option=-O1",
+                "--enable-optimized"]))
+    factory.addStep(Compile(name="stage1_build_quick",
+                            haltOnFailure = False,
+                            flunkOnFailure=False,
+                            command=["make", "-j8", "-k"]))
     factory.addStep(Compile(name="stage1_build_quick",
                             haltOnFailure = False,
                             flunkOnFailure=False,
@@ -374,21 +390,21 @@ def get_builders():
                             command=["make", "-k"]))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
-            command         = ["make", "-j4", "check"],
+            command         = ["make", "LIT_ARGS=-v -j1", "check"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
                                     flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
-            command         = ["make", "-j4", "clang-test"],
+            command         = ["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"],
             flunkOnFailure  = False,
             warnOnWarnings  = False,
             flunkOnWarnings = False,
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
     factory.addStep(Compile(name="stage1_install",
-                            command=["make", "install", "-k", "-j4"]))
+                            command=["make", "install", "-k"]))
 
     # stage 2
     BuildStageNcyg(factory, 2)
@@ -408,12 +424,13 @@ def get_builders():
                                  description="Comparing",
                                  descriptionDone="Compare-2-3",
                                  command=["find",
-                                          "bin",
+                                          "!", "-wholename", "*/test/*",
                                           "-type", "f",
-                                          "!", "-name", "llvm-config",
+                                          "-name", "*.o",
+                                          "!", "-name", "llvm-config*",
                                           "-exec",
                                           "cmp", "../stage2/{}", "{}", ";"],
-                                 workdir="last/install/stage3"))
+                                 workdir="last/stage3"))
     yield BuilderConfig(name="clang-3stage-cygwin",
                         slavenames=["cygwin"],
                         mergeRequests=True,
@@ -465,10 +482,10 @@ def get_builders():
     factory.addStep(LitTestCommand(
             name="test_llvm",
             command=["make", "LIT_ARGS=-v -j1", "check"]))
-    yield BuilderConfig(name="clang-i686-cygwin",
-                        mergeRequests=True,
-                        slavenames=["cygwin"],
-                        factory=factory)
+    # yield BuilderConfig(name="clang-i686-cygwin",
+    #                     mergeRequests=True,
+    #                     slavenames=["cygwin"],
+    #                     factory=factory)
 
     # PS3
     factory = BuildFactory()
@@ -491,7 +508,7 @@ def get_builders():
                 "CXX=ccache g++",
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "--enable-optimized",
-                "--with-optimize-option=-O3 -UPPC",
+                "--with-optimize-option=-O3 -UPPC -fno-strict-aliasing",
                 "--build=ppc-redhat-linux"],
             doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
@@ -523,9 +540,10 @@ def get_builders():
     # autoconf-msys
     factory = BuildFactory()
     AddGitWin7(factory)
-    PatchLLVM(factory, "makefile.patch")
+#    PatchLLVM(factory, "makefile.patch")
 #    PatchLLVM(factory, "llvm.patch")
 #    PatchClang(factory, "clang.patch")
+    PatchLLVMClang(factory, "llvmclang.diff")
     factory.addStep(SetProperty(name="get_msys_path",
                                 command=["sh", "-c", "PWD= sh pwd"],
                                 workdir=".",
@@ -534,7 +552,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "sh", "-c",
-                WithProperties("PATH=/bin:$PATH PWD=%(workdir_msys)s/build %(workdir_msys)s/llvm-project/llvm/configure -C --enable-optimized --with-clang-srcdir=%(workdir_msys)s/llvm-project/clang")],
+                WithProperties("PATH=/bin:$PATH PWD=%(workdir_msys)s/build %(workdir_msys)s/llvm-project/llvm/configure -C --enable-optimized --disable-pthreads --with-clang-srcdir=%(workdir_msys)s/llvm-project/clang")],
             doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["sh", "-c",
                                           "./config.status --recheck"],
@@ -564,7 +582,7 @@ def get_builders():
     # cmake-msys
     factory = BuildFactory()
     AddGitWin7(factory)
-    #PatchLLVM(factory, "llvm.patch")
+    PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory)
     AddCMakeDOS(factory, "MSYS Makefiles",
                 CMAKE_BUILD_TYPE="Release",
