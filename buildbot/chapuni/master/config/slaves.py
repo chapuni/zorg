@@ -14,4 +14,5 @@ def get_build_slaves():
         create_slave("win7"),
         create_slave("cygwin"),
         create_slave("ps3-f12"),
+        create_slave("amd64-solaris"),
         ]
