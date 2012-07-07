@@ -30,6 +30,7 @@ def not_triggered(step):
 
 from buildbot import locks
 centos5_lock = locks.SlaveLock("centos5_lock")
+centos6_lock = locks.SlaveLock("centos6_lock")
 win7_git_lock = locks.SlaveLock("win7_git_lock")
 #win7_cyg_lock = locks.MasterLock("win7_cyg_lock", maxCount=8)
 
@@ -73,7 +74,7 @@ def AddGitWin7(factory):
         [win7_git_lock.access('counting')])
     AddGitLLVMTree(
         factory,
-        'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
+        'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
         'D:/llvm-project.git')
 
 def AddCMake(factory, G,
@@ -109,6 +110,16 @@ def AddCMakeCentOS5(factory,
              HAVE_NEARBYINTF=1,
              **kwargs)
 
+def AddCMakeCentOS6(factory,
+                    LLVM_TARGETS_TO_BUILD="all",
+                    **kwargs):
+    AddCMake(factory, "Unix Makefiles",
+             CMAKE_COLOR_MAKEFILE="OFF",
+             CMAKE_BUILD_TYPE="Release",
+             LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
+             LLVM_LIT_ARGS="-v",
+             **kwargs)
+
 def AddCMakeDOS(factory, G, **kwargs):
     AddCMake(factory, G,
              LLVM_TARGETS_TO_BUILD="all",
@@ -142,17 +153,66 @@ def BuildStageN(factory, n,
             workdir=workdir))
     factory.addStep(LitTestCommand(
             name="test_clang",
-            locks=[centos5_lock.access('counting')],
             command=["make", "TESTARGS=-v -j4", "-C", "tools/clang/test"],
             workdir=workdir))
     factory.addStep(LitTestCommand(
             name="test_llvm",
-            locks=[centos5_lock.access('counting')],
             command=["make", "LIT_ARGS=-v -j4", "check"],
             workdir=workdir))
     factory.addStep(Compile(
             name="install",
             command=["make", "VERBOSE=1", "install", "-j4"],
+            workdir=workdir))
+    factory.addStep(ShellCommand(
+            name="install_fix",
+            command=[
+                "mv", "-v",
+                tmpinst,
+                "%s/stage%d" % (instroot, n)],
+            workdir="."))
+    factory.addStep(ShellCommand(
+            name="builddir_fix",
+            command=[
+                "mv", "-v",
+                workdir,
+                "%s/stage%d" % (root, n)],
+            workdir="."))
+
+def BuildStageN8(factory, n,
+                root="builds"):
+    instroot="%s/install" % root
+    workdir="%s/stagen" % root
+    tools="%s/stage%d/bin" % (instroot, n - 1)
+    tmpinst="%s/stagen" % instroot
+    factory.addStep(ShellCommand(
+            command=[
+                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                WithProperties("CC=%%(workdir)s/%s/clang -std=gnu89" % tools),
+                WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
+                WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
+                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "--disable-timestamps",
+                "--disable-assertions",
+                "--enable-optimized"],
+            name="configure",
+            description="configuring",
+            descriptionDone="Configure",
+            workdir=workdir))
+    factory.addStep(Compile(
+            name="build",
+            command=["make", "VERBOSE=1", "-k", "-j8", "-l8.2"],
+            workdir=workdir))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
+            workdir=workdir))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["make", "LIT_ARGS=-v -j8", "check"],
+            workdir=workdir))
+    factory.addStep(Compile(
+            name="install",
+            command=["make", "VERBOSE=1", "install", "-j8"],
             workdir=workdir))
     factory.addStep(ShellCommand(
             name="install_fix",
@@ -205,11 +265,11 @@ def BuildStageNcyg(factory, n,
                             workdir=workdir))
     factory.addStep(LitTestCommand(
             name="test_clang",
-            command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
+            command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"],
             workdir=workdir))
     factory.addStep(LitTestCommand(
             name="test_llvm",
-            command=["make", "LIT_ARGS=-v -j8", "check"],
+            command=["make", "LIT_ARGS=-v -j1", "check"],
             workdir=workdir))
     factory.addStep(Compile(
             name="install",
@@ -260,7 +320,7 @@ def get_builders():
     CheckMakefile(factory)
     AddCMakeCentOS5(factory, buildClang=False, doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
-            command         = ["make", "-j4", "-k", "check.deps"],
+            command         = ["make", "-j4", "-k"],
             name            = 'build_llvm'))
     factory.addStep(LitTestCommand(
             name            = 'test_llvm',
@@ -271,7 +331,29 @@ def get_builders():
                         slavenames=["centos5"],
                         mergeRequests=False,
                         locks=[centos5_lock.access('counting')],
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.2/bin:${PATH}'},
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+                        factory=factory)
+
+    # CentOS6(llvm-x86)
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+    CheckMakefile(factory)
+    AddCMakeCentOS6(factory, buildClang=False, doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            command         = ["make", "-j8", "-k"],
+            name            = 'build_llvm'))
+    factory.addStep(LitTestCommand(
+            name            = 'test_llvm',
+            command         = ["make", "-j8", "check-llvm"],
+            description     = ["testing", "llvm"],
+            descriptionDone = ["test",    "llvm"]))
+    yield BuilderConfig(name="cmake-llvm-x86_64-centos6",
+                        slavenames=["centos6"],
+                        mergeRequests=False,
+                        locks=[centos6_lock.access('counting')],
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
                         factory=factory)
 
     # CentOS5(clang only)
@@ -282,19 +364,40 @@ def get_builders():
     CheckMakefile(factory)
     AddCMakeCentOS5(factory, doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
-            command         = ["make", "-j4", "-k", "clang-test.deps"],
+            command         = ["make", "-j4", "-k"],
             locks           = [centos5_lock.access('counting')],
             name            = 'build_clang'))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
-            locks           = [centos5_lock.access('counting')],
             command         = ["make", "-j4", "clang-test"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
     yield BuilderConfig(name="cmake-clang-x86_64-linux",
                         slavenames=["centos5"],
                         mergeRequests=False,
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.2/bin:${PATH}'},
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+                        factory=factory)
+
+    # CentOS6(clang only)
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+    CheckMakefile(factory)
+    AddCMakeCentOS6(factory, doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            command         = ["make", "-j8", "-k"],
+            locks           = [centos6_lock.access('counting')],
+            name            = 'build_clang'))
+    factory.addStep(LitTestCommand(
+            name            = 'test_clang',
+            command         = ["make", "-j8", "check-clang"],
+            description     = ["testing", "clang"],
+            descriptionDone = ["test",    "clang"]))
+    yield BuilderConfig(name="cmake-clang-x86_64-centos6",
+                        slavenames=["centos6"],
+                        mergeRequests=False,
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
                         factory=factory)
 
     # CentOS5(3stage)
@@ -313,7 +416,6 @@ def get_builders():
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
             command         = ["make", "-j4", "-k", "check"],
-            locks           = [centos5_lock.access('counting')],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
@@ -321,7 +423,6 @@ def get_builders():
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "-j4", "-k", "clang-test"],
-            locks           = [centos5_lock.access('counting')],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
     factory.addStep(Compile(name="stage1_install",
@@ -355,13 +456,72 @@ def get_builders():
     yield BuilderConfig(name="clang-3stage-x86_64-linux",
                         slavenames=["centos5"],
                         mergeRequests=True,
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.2/bin:${PATH}'},
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+                        factory=factory)
+
+    # CentOS6(3stage)
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+                                    flunkOnFailure=False))
+    #PatchLLVMClang(factory, "llvmclang.diff")
+    AddCMakeCentOS6(factory,
+                    LLVM_TARGETS_TO_BUILD="X86",
+                    prefix="builds/install/stage1")
+    factory.addStep(Compile(name="stage1_build",
+                            command=["make", "-j8", "-l8.2", "-k"]))
+    factory.addStep(LitTestCommand(
+            name            = 'stage1_test_llvm',
+            command         = ["make", "-j8", "-k", "check-llvm"],
+            description     = ["testing", "llvm"],
+            descriptionDone = ["test",    "llvm"]))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+                                    flunkOnFailure=False))
+    factory.addStep(LitTestCommand(
+            name            = 'stage1_test_clang',
+            command         = ["make", "-j8", "-k", "check-clang"],
+            description     = ["testing", "clang"],
+            descriptionDone = ["test",    "clang"]))
+    factory.addStep(Compile(name="stage1_install",
+                            command=["make", "install", "-k", "-j8"]))
+
+    # stage 2
+    BuildStageN8(factory, 2)
+
+    # stage 3
+    BuildStageN8(factory, 3)
+
+    # Trail
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
+                                    flunkOnFailure=False))
+    factory.addStep(ShellCommand(name="save_builds",
+                                 command=["mv", "-v",
+                                          "builds",
+                                          "last"],
+                                 workdir="."))
+    factory.addStep(ShellCommand(name="compare_23",
+                                 description="Comparing",
+                                 descriptionDone="Compare-2-3",
+                                 command=["find",
+                                          "!", "-wholename", "*/test/*",
+                                          "-type", "f",
+                                          "-name", "*.o",
+                                          "!", "-name", "llvm-config*",
+                                          "-exec",
+                                          "cmp", "../stage2/{}", "{}", ";"],
+                                 workdir="last/stage3"))
+    yield BuilderConfig(name="clang-3stage-x86_64-centos6",
+                        slavenames=["centos6"],
+                        mergeRequests=True,
+                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
                         factory=factory)
 
     # Cygwin(3stage)
     factory = BuildFactory()
     AddGitLLVMTree(factory,
-                    'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
+                    'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
                     '/cygdrive/d/llvm-project.git')
     PatchLLVMClang(factory, "llvmclang.diff")
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
@@ -398,14 +558,14 @@ def get_builders():
                             command=["make", "-k"]))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
-            command         = ["make", "LIT_ARGS=-v -j8", "check"],
+            command         = ["make", "LIT_ARGS=-v -j1", "check"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
                                     flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
-            command         = ["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
+            command         = ["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"],
             flunkOnFailure  = False,
             warnOnWarnings  = False,
             flunkOnWarnings = False,
@@ -448,7 +608,7 @@ def get_builders():
     factory = BuildFactory()
     # check out the source
     AddGitLLVMTree(factory,
-                    'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
+                    'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
                     '/cygdrive/d/llvm-project.git')
     CheckMakefile(factory)
     PatchLLVM(factory, "llvm.patch")
@@ -505,7 +665,7 @@ def get_builders():
                                  timeout=3600,
                                  flunkOnFailure=False));
     AddGitLLVMTree(factory,
-                   'chapuni@192.168.1.193:/var/cache/llvm-project-tree.git',
+                   'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
                    '/home/chapuni/llvm-project.git')
     CheckMakefile(factory)
     factory.addStep(ShellCommand(
@@ -622,7 +782,7 @@ def get_builders():
     factory = BuildFactory()
     AddGitWin7(factory)
     PatchLLVMClang(factory, "llvmclang.diff")
-    CheckMakefile(factory, makefile="LLVM.sln")
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj")
     AddCMakeDOS(factory, "Visual Studio 10",
                 doStepIf=Makefile_not_ready)
     factory.addStep(Compile(name="all_build_quick",
@@ -633,13 +793,13 @@ def get_builders():
                                      "-m",
                                      "-v:m",
                                      "-p:Configuration=Release",
-                                     "LLVM.sln"]))
+                                     "ALL_BUILD.vcxproj"]))
     factory.addStep(Compile(name="all_build",
                             command=["c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe",
                                      "-m",
                                      "-v:m",
                                      "-p:Configuration=Release",
-                                     "LLVM.sln"]))
+                                     "ALL_BUILD.vcxproj"]))
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
