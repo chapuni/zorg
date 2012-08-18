@@ -85,6 +85,7 @@ def AddCMake(factory, G,
              **kwargs):
     cmd = ["cmake", "-G"+G]
     cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
+    cmd.append("-DLLVM_BUILD_TESTS=ON")
     if buildClang:
         cmd.append("-DLLVM_CLANG_SOURCE_DIR=%s/../clang" % source)
         cmd.append("-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%s/../clang" % source)
@@ -327,12 +328,12 @@ def get_builders():
             command         = ["make", "-j4", "check"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
-    yield BuilderConfig(name="cmake-llvm-x86_64-linux",
-                        slavenames=["centos5"],
-                        mergeRequests=False,
-                        locks=[centos5_lock.access('counting')],
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
-                        factory=factory)
+    # yield BuilderConfig(name="cmake-llvm-x86_64-linux",
+    #                     slavenames=["centos5"],
+    #                     mergeRequests=False,
+    #                     locks=[centos5_lock.access('counting')],
+    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+    #                     factory=factory)
 
     # CentOS6(llvm-x86)
     factory = BuildFactory()
@@ -349,7 +350,7 @@ def get_builders():
             command         = ["make", "-j8", "check-llvm"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
-    yield BuilderConfig(name="cmake-llvm-x86_64-centos6",
+    yield BuilderConfig(name="cmake-llvm-x86_64-linux",
                         slavenames=["centos6"],
                         mergeRequests=False,
                         locks=[centos6_lock.access('counting')],
@@ -372,11 +373,11 @@ def get_builders():
             command         = ["make", "-j4", "clang-test"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
-    yield BuilderConfig(name="cmake-clang-x86_64-linux",
-                        slavenames=["centos5"],
-                        mergeRequests=False,
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
-                        factory=factory)
+    # yield BuilderConfig(name="cmake-clang-x86_64-linux",
+    #                     slavenames=["centos5"],
+    #                     mergeRequests=False,
+    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+    #                     factory=factory)
 
     # CentOS6(clang only)
     factory = BuildFactory()
@@ -394,7 +395,7 @@ def get_builders():
             command         = ["make", "-j8", "check-clang"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
-    yield BuilderConfig(name="cmake-clang-x86_64-centos6",
+    yield BuilderConfig(name="cmake-clang-x86_64-linux",
                         slavenames=["centos6"],
                         mergeRequests=False,
                         env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
@@ -453,11 +454,11 @@ def get_builders():
                                           "-exec",
                                           "cmp", "../stage2/{}", "{}", ";"],
                                  workdir="last/stage3"))
-    yield BuilderConfig(name="clang-3stage-x86_64-linux",
-                        slavenames=["centos5"],
-                        mergeRequests=True,
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
-                        factory=factory)
+    # yield BuilderConfig(name="clang-3stage-x86_64-linux",
+    #                     slavenames=["centos5"],
+    #                     mergeRequests=True,
+    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+    #                     factory=factory)
 
     # CentOS6(3stage)
     factory = BuildFactory()
@@ -512,7 +513,7 @@ def get_builders():
                                           "-exec",
                                           "cmp", "../stage2/{}", "{}", ";"],
                                  workdir="last/stage3"))
-    yield BuilderConfig(name="clang-3stage-x86_64-centos6",
+    yield BuilderConfig(name="clang-3stage-x86_64-linux",
                         slavenames=["centos6"],
                         mergeRequests=True,
                         env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},

@@ -50,11 +50,9 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="quick-clang",
         change_filter = change_llvmclang_master,
-        treeStableTimer=30,
-#        treeStableTimer=None,
+        treeStableTimer=None,
         builderNames=[
             "cmake-clang-x86_64-linux",
-            "cmake-clang-x86_64-centos6",
             ])
     yield AnyBranchScheduler(
         name="notquick",
@@ -66,11 +64,9 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="quick-llvm",
         change_filter = change_llvm_master,
-        treeStableTimer=30,
-#        treeStableTimer=None,
+        treeStableTimer=None,
         builderNames=[
             "cmake-llvm-x86_64-linux",
-            "cmake-llvm-x86_64-centos6",
             ])
     yield AnyBranchScheduler(
         name="stable",
@@ -81,7 +77,6 @@ def get_schedulers():
                       "clang-3stage-cygwin",
                       "clang-ppc-linux",
                       "clang-3stage-x86_64-linux",
-                      "clang-3stage-x86_64-centos6",
                       ])
 
 #EOF
