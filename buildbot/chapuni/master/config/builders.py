@@ -87,7 +87,6 @@ def AddCMake(factory, G,
     cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
     cmd.append("-DLLVM_BUILD_TESTS=ON")
     if buildClang:
-        cmd.append("-DLLVM_CLANG_SOURCE_DIR=%s/../clang" % source)
         cmd.append("-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%s/../clang" % source)
     for i in sorted(kwargs.items()):
         cmd.append("-D%s=%s" % i)
@@ -202,15 +201,19 @@ def BuildStageN8(factory, n,
     factory.addStep(Compile(
             name="build",
             command=["make", "VERBOSE=1", "-k", "-j8", "-l8.2"],
+            warnOnWarnings = True,
             workdir=workdir))
-    factory.addStep(LitTestCommand(
-            name="test_clang",
-            command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
-            workdir=workdir))
-    factory.addStep(LitTestCommand(
-            name="test_llvm",
-            command=["make", "LIT_ARGS=-v -j8", "check"],
-            workdir=workdir))
+
+    if n != 3:
+        factory.addStep(LitTestCommand(
+                name="test_clang",
+                command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
+                workdir=workdir))
+        factory.addStep(LitTestCommand(
+                name="test_llvm",
+                command=["make", "LIT_ARGS=-v -j8", "check"],
+                workdir=workdir))
+
     factory.addStep(Compile(
             name="install",
             command=["make", "VERBOSE=1", "install", "-j8"],
@@ -254,24 +257,30 @@ def BuildStageNcyg(factory, n,
     factory.addStep(Compile(name="make_quick",
                             haltOnFailure = False,
                             flunkOnFailure=False,
+                            warnOnWarnings = True,
                             locks = [win7_cyg_lock.access('exclusive')],
-                            command=["make", "VERBOSE=1", "-k", "-j5"],
+                            command=["make", "VERBOSE=1", "-k", "-j8"],
                             workdir=workdir))
     factory.addStep(Compile(name="make_quick_again",
                             haltOnFailure = False,
+                            warnOnWarnings = True,
                             flunkOnFailure=False,
                             command=["make", "VERBOSE=1", "-k", "-j8"],
                             workdir=workdir))
     factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"],
+                            warnOnWarnings = True,
                             workdir=workdir))
-    factory.addStep(LitTestCommand(
-            name="test_clang",
-            command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"],
-            workdir=workdir))
-    factory.addStep(LitTestCommand(
-            name="test_llvm",
-            command=["make", "LIT_ARGS=-v -j1", "check"],
-            workdir=workdir))
+
+    if n != 3:
+        factory.addStep(LitTestCommand(
+                name="test_clang",
+                command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"],
+                workdir=workdir))
+        factory.addStep(LitTestCommand(
+                name="test_llvm",
+                command=["make", "LIT_ARGS=-v -j1", "check"],
+                workdir=workdir))
+
     factory.addStep(Compile(
             name="install",
             command=["make", "VERBOSE=1", "install", "-j1"],
@@ -313,12 +322,21 @@ def PatchLLVMClang(factory, name):
 
 def BlobPre(factory):
     factory.addStep(ShellCommand(
+            command=[
+                "sh", "-c",
+                "mkdir -p build install",
+                ],
+            flunkOnFailure=False,
+            workdir="."))
+    factory.addStep(ShellCommand(
             name="blob-prebuild-add",
             description="Adding prebuild blob",
             descriptionDone="Added prebuild blob",
             command=[
                 "git", "--git-dir=blob.git", "--work-tree=.",
-                "add", "-A", "--ignore-errors", "build",
+                "add", "-A", "--ignore-errors",
+                "build",
+                "install",
                 ],
             flunkOnFailure=False,
             alwaysRun=True,
@@ -336,10 +354,25 @@ def BlobPre(factory):
                 ],
             flunkOnFailure=False,
             alwaysRun=True,
+            timeout=3600,
             workdir=".",
             ))
+    factory.addStep(ShellCommand(
+            command=[
+                "sh", "-c",
+                "../mkref",
+                ],
+            flunkOnFailure=False,
+            workdir="."))
 
 def BlobPost(factory):
+    factory.addStep(ShellCommand(
+            command=[
+                "sh", "-c",
+                "mkdir -p build install",
+                ],
+            flunkOnFailure=False,
+            workdir="."))
     factory.addStep(ShellCommand(
             command=[
                 "chmod", "-R", "u+r",
@@ -353,7 +386,9 @@ def BlobPost(factory):
             descriptionDone="Added blob",
             command=[
                 "git", "--git-dir=blob.git", "--work-tree=.",
-                "add", "-A", "--ignore-errors", "build",
+                "add", "-A", "--ignore-errors",
+                "build",
+                "install",
                 ],
             flunkOnFailure=False,
             warnOnFailure=True,
@@ -374,10 +409,19 @@ def BlobPost(factory):
             flunkOnFailure=False,
             warnOnFailure=True,
             alwaysRun=True,
+            timeout=3600,
             workdir=".",
             ))
 
 def BlobPre3(factory):
+    factory.addStep(ShellCommand(
+            command=[
+                "mkdir", "-p",
+                "build",
+                "builds",
+                ],
+            flunkOnFailure=False,
+            workdir="."))
     factory.addStep(ShellCommand(
             name="blob-prebuild-add",
             description="Adding prebuild blob",
@@ -403,10 +447,26 @@ def BlobPre3(factory):
                 ],
             flunkOnFailure=False,
             alwaysRun=True,
+            timeout=3600,
             workdir=".",
             ))
+    factory.addStep(ShellCommand(
+            command=[
+                "sh", "-c",
+                "../mkref",
+                ],
+            flunkOnFailure=False,
+            workdir="."))
 
 def BlobPost3(factory):
+    factory.addStep(ShellCommand(
+            command=[
+                "mkdir", "-p",
+                "build",
+                "builds",
+                ],
+            flunkOnFailure=False,
+            workdir="."))
     factory.addStep(ShellCommand(
             command=[
                 "chmod", "-Rf", "u+r",
@@ -440,6 +500,7 @@ def BlobPost3(factory):
                 ],
             flunkOnFailure=False,
             warnOnFailure=True,
+            timeout=3600,
             alwaysRun=True,
             workdir=".",
             ))
@@ -477,7 +538,10 @@ def get_builders():
     BlobPre(factory)
 
     CheckMakefile(factory)
-    AddCMakeCentOS6(factory, buildClang=False, doStepIf=Makefile_not_ready)
+    AddCMakeCentOS6(
+        factory, buildClang=False,
+        LLVM_BUILD_EXAMPLES="ON",
+        doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j8", "-k"],
             name            = 'build_llvm'))
@@ -525,14 +589,22 @@ def get_builders():
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
     CheckMakefile(factory)
-    AddCMakeCentOS6(factory, doStepIf=Makefile_not_ready)
+    AddCMakeCentOS6(
+        factory,
+        LLVM_BUILD_EXAMPLES="OFF",
+        LLVM_BUILD_RUNTIME="OFF",
+        LLVM_BUILD_TESTS="OFF",
+        LLVM_BUILD_TOOLS="OFF",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        CLANG_BUILD_EXAMPLES="ON",
+        doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j8", "-k"],
             locks           = [centos6_lock.access('counting')],
             name            = 'build_clang'))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
-            command         = ["make", "-j8", "check-clang"],
+            command         = ["make", "-j8", "check-all"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
     BlobPost(factory)
@@ -612,6 +684,9 @@ def get_builders():
     #PatchLLVMClang(factory, "llvmclang.diff")
     AddCMakeCentOS6(factory,
                     LLVM_TARGETS_TO_BUILD="X86",
+                    LLVM_ENABLE_ASSERTIONS="ON",
+                    LLVM_BUILD_EXAMPLES="ON",
+                    CLANG_BUILD_EXAMPLES="ON",
                     prefix="builds/install/stage1")
     factory.addStep(Compile(name="stage1_build",
                             command=["make", "-j8", "-l8.2", "-k"]))
@@ -671,6 +746,8 @@ def get_builders():
     BlobPre3(factory)
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/llvm-project/clang/test/Index"),
+                                    flunkOnFailure=False))
 #     AddCMake(factory, "Unix Makefiles",
 #              LLVM_TARGETS_TO_BUILD="X86",
 #              CMAKE_COLOR_MAKEFILE="OFF",
@@ -695,7 +772,7 @@ def get_builders():
                             haltOnFailure = False,
                             flunkOnFailure=False,
                             locks = [win7_cyg_lock.access('exclusive')],
-                            command=["make", "-j5", "-k"]))
+                            command=["make", "-j8", "-k"]))
     factory.addStep(Compile(name="stage1_build_quick",
                             haltOnFailure = False,
                             flunkOnFailure=False,
@@ -751,57 +828,6 @@ def get_builders():
                         mergeRequests=True,
                         factory=factory)
 
-    # Cygwin
-    factory = BuildFactory()
-    # check out the source
-    AddGitLLVMTree(factory,
-                    'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
-                    '/cygdrive/d/llvm-project.git')
-    CheckMakefile(factory)
-    PatchLLVM(factory, "llvm.patch")
-    factory.addStep(ShellCommand(
-            command=[
-                "../llvm-project/llvm/configure",
-                "-C",
-                #"--enable-shared",
-                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
-                "LIBS=-static",
-                "--enable-optimized"],
-            doStepIf=Makefile_not_ready))
-    factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
-                                 doStepIf=sample_needed_update,
-                                 workdir="build/projects/sample"))
-    factory.addStep(ShellCommand(command=["./config.status"],
-                                 doStepIf=sample_needed_update,
-                                 workdir="build/projects/sample"))
-    factory.addStep(Compile(name="make_quick",
-                            haltOnFailure = False,
-                            flunkOnFailure=False,
-                            command=["make", "VERBOSE=1", "-k", "-j8"]))
-    factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"]))
-
-    # Build plugin manually
-    # factory.addStep(Compile(command=["make", "OPTIONAL_DIRS=Hello",
-    #                                  "-C", "lib/Transforms"]))
-
-    # XXX
-    factory.addStep(ShellCommand(command=["sh", "-c",
-                                          "for x in Release*/bin; do mkdir xxx;mv -v $x/* xxx;cp -v xxx/* $x;rm -rf xxx; done"],
-                                 workdir="build"))
-
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
-                                    flunkOnFailure=False))
-    factory.addStep(LitTestCommand(
-            name="test_clang",
-            command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"]))
-    factory.addStep(LitTestCommand(
-            name="test_llvm",
-            command=["make", "LIT_ARGS=-v -j1", "check"]))
-    # yield BuilderConfig(name="clang-i686-cygwin",
-    #                     mergeRequests=True,
-    #                     slavenames=["cygwin"],
-    #                     factory=factory)
-
     # PS3
     factory = BuildFactory()
     # check out the source
@@ -814,6 +840,7 @@ def get_builders():
     AddGitLLVMTree(factory,
                    'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
                    '/home/chapuni/llvm-project.git')
+    PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory)
     factory.addStep(ShellCommand(
             command=[
@@ -837,16 +864,16 @@ def get_builders():
                      "VERBOSE=1",
                      "-k",
                      ],
-            timeout=3600,
+            timeout=2 * 60 * 60,
             ))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
                                     flunkOnFailure=False))
-    factory.addStep(ShellCommand(name="test_clang",
-                                 flunkOnFailure=False,
-                                 warnOnWarnings=False,
-                                 flunkOnWarnings=False,
-                                 command=["make", "TESTARGS=-v",
-                                          "-C", "tools/clang/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            flunkOnFailure=False,
+            warnOnWarnings=False,
+            flunkOnWarnings=False,
+            command=["make", "TESTARGS=-v", "-C", "tools/clang/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
             command=["make", "LIT_ARGS=-v", "check"]))
@@ -868,12 +895,17 @@ def get_builders():
                                 property="workdir_msys"))
 
     BlobPre(factory)
-
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf", "install",
+                ],
+            flunkOnFailure=False,
+            workdir="."))
     CheckMakefile(factory)
     factory.addStep(ShellCommand(
             command=[
                 "sh", "-c",
-                WithProperties("PATH=/bin:$PATH PWD=%(workdir_msys)s/build %(workdir_msys)s/llvm-project/llvm/configure -C --enable-optimized --disable-pthreads --with-clang-srcdir=%(workdir_msys)s/llvm-project/clang")],
+                WithProperties("PATH=/bin:$PATH PWD=%(workdir_msys)s/build %(workdir_msys)s/llvm-project/llvm/configure -C --enable-optimized --disable-pthreads --with-clang-srcdir=%(workdir_msys)s/llvm-project/clang --disable-docs --prefix=%(workdir_msys)s/install")],
             doStepIf=Makefile_not_ready))
     factory.addStep(ShellCommand(command=["sh", "-c",
                                           "./config.status --recheck"],
@@ -883,7 +915,9 @@ def get_builders():
                                           "./config.status"],
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
-    factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"]))
+    factory.addStep(Compile(command=["make", "install", "VERBOSE=1", "-k", "-j1"]))
+    factory.addStep(Compile(command=["make", "-C", "unittests", "VERBOSE=1", "-k", "-j1"]))
+    factory.addStep(Compile(command=["make", "-C", "tools/clang/unittests", "VERBOSE=1", "-k", "-j1"]))
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
@@ -926,25 +960,86 @@ def get_builders():
             name="test_llvm",
             command=["make", "-j1", "check"]))
     BlobPost(factory)
-    yield BuilderConfig(name="cmake-clang-i686-msys",
+    # yield BuilderConfig(name="cmake-clang-i686-msys",
+    #                     mergeRequests=True,
+    #                     slavenames=["win7"],
+    #                     factory=factory)
+
+    # cmake-mingw32-ninja
+    #ninja = "D:/archives/ninja.exe"
+    ninja = "E:/bb-win7/ninja.exe"
+    factory = BuildFactory()
+    AddGitWin7(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
+    BlobPre(factory)
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeDOS(
+        factory, "Ninja",
+        CMAKE_BUILD_TYPE="Release",
+        CMAKE_MAKE_PROGRAM=ninja,
+        LLVM_ENABLE_ASSERTIONS="ON",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            command=[ninja, "install", "-j8"],
+            locks = [win7_cyg_lock.access('exclusive')],
+            ))
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+            flunkOnFailure=False))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=.",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "tools/clang/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_clang_extra",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=.",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "tools/clang/tools/extra/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=.",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "test"]))
+    BlobPost(factory)
+    yield BuilderConfig(name="cmake-clang-i686-mingw32",
                         mergeRequests=True,
                         slavenames=["win7"],
                         factory=factory)
 
     # MSVC10
+    msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
     factory = BuildFactory()
     AddGitWin7(factory)
     BlobPre(factory)
     PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="ALL_BUILD.vcxproj")
-    AddCMakeDOS(factory, "Visual Studio 10",
-                doStepIf=Makefile_not_ready)
+    AddCMakeDOS(
+        factory, "Visual Studio 10",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        doStepIf=Makefile_not_ready)
     factory.addStep(Compile(name="zero_check",
                             haltOnFailure = False,
                             flunkOnFailure=False,
                             warnOnFailure=True,
                             timeout=3600,
-                            command=["c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe",
+                            command=[msbuild,
                                      "-m",
                                      "-v:m",
                                      "-p:Configuration=Release",
@@ -954,17 +1049,17 @@ def get_builders():
                             flunkOnFailure=False,
                             timeout=3600,
                             locks = [win7_cyg_lock.access('exclusive')],
-                            command=["c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe",
+                            command=[msbuild,
                                      "-m",
                                      "-v:m",
                                      "-p:Configuration=Release",
                                      "ALL_BUILD.vcxproj"]))
-    factory.addStep(Compile(name="all_build",
-                            command=["c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe",
+    factory.addStep(Compile(name="install",
+                            command=[msbuild,
                                      "-m",
                                      "-v:m",
                                      "-p:Configuration=Release",
-                                     "ALL_BUILD.vcxproj"]))
+                                     "INSTALL.vcxproj"]))
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
@@ -978,6 +1073,14 @@ def get_builders():
                      "--param", "build_mode=Release",
                      "-v",
                      "tools/clang/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_extra",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=Release",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "tools/clang/tools/extra/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
             command=["c:/Python27/python.exe",
@@ -995,5 +1098,56 @@ def get_builders():
             'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;'
             },
         factory=factory)
+
+    # MSVC9
+    factory = BuildFactory()
+    AddGitWin7(factory)
+    BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeDOS(
+        factory, "Ninja",
+        CMAKE_C_COMPILER="cl",
+        CMAKE_CXX_COMPILER="cl",
+        CMAKE_BUILD_TYPE="Release",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            command=[ninja, "-j8"],
+            locks = [win7_cyg_lock.access('exclusive')],
+            ))
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+            flunkOnFailure=False))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=.",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "tools/clang/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=.",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "test"]))
+    BlobPost(factory)
+    # yield BuilderConfig(
+    #     name="cmake-clang-i686-msvc9",
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\ATLMFC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\INCLUDE;C:\Program Files\Microsoft SDKs\Windows\v6.0A\include;',
+    #         'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\ATLMFC\LIB;D:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\LIB;C:\Program Files\Microsoft SDKs\Windows\v6.0A\lib;',
+    #         'PATH': r'd:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;d:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\BIN;d:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\Tools;C:\Windows\Microsoft.NET\Framework\v3.5;C:\Windows\Microsoft.NET\Framework\v2.0.50727;d:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\VCPackages;C:\Program Files\Microsoft SDKs\Windows\v6.0A\bin;${PATH};E:\bb-win7',
+    #         },
+    #     factory=factory)
 
 #EOF
