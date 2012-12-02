@@ -15,7 +15,7 @@ def Tcmake(l):
 def Tllvmlib(l):
     return filter_t(l, r'^llvm/(include|lib|tools|utils)/')
 def Fllvmtest(l): return filter_f(l, r'^llvm/test/.+/')
-def Fhtml(l): return filter_f(l, r'\.(html|rst)(\.\w)?$')
+def Fhtml(l): return filter_f(l, r'\.(TXT|html|rst)(\.\w)?$')
 def FGNUmake(l): return filter_f(l, r'/Makefile(\.\w+)$')
 def Fautoconf(l): return filter_f(FGNUmake(l), r'^llvm/autoconf/')
 def Fcmakefiles(l): return filter_f(l, r'/CMakeLists\.txt$')
@@ -88,7 +88,7 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="notquick5",
         change_filter = change_cmake_llvmclang,
-        treeStableTimer=5 * 60,
+        treeStableTimer=15 * 60,
         builderNames=[
             "cmake-clang-i686-msvc10",
 #            "cmake-clang-i686-msvc9",

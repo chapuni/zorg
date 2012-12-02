@@ -22,7 +22,7 @@ def Makefile_not_ready(step):
     return step.build.getProperty("exists_Makefile") != "OK"
 
 def sample_needed_update(step):
-    return step.build.getProperty("branch") == "release_30"
+    return False and step.build.getProperty("branch") == "release_32"
 
 def not_triggered(step):
     return not (step.build.getProperty("scheduler") == 'cmake-llvm-x86_64-linux'
@@ -43,10 +43,15 @@ def CheckMakefile(factory, makefile="Makefile"):
 
 # Factories
 def AddGitLLVMTree(factory, repo, ref):
-    factory.addStep(Git(repourl=repo,
-                        reference=ref,
-                        timeout=3600,
-                        workdir='llvm-project'))
+    if ref is None:
+        factory.addStep(Git(repourl=repo,
+                            timeout=3600,
+                            workdir='llvm-project'))
+    else:
+        factory.addStep(Git(repourl=repo,
+                            reference=ref,
+                            timeout=3600,
+                            workdir='llvm-project'))
     factory.addStep(SetProperty(name="got_revision",
                                 command=["git", "describe", "--tags"],
                                 workdir="llvm-project",
@@ -74,7 +79,7 @@ def AddGitWin7(factory):
         [win7_git_lock.access('counting')])
     AddGitLLVMTree(
         factory,
-        'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
+        'git://192.168.1.199/var/cache/llvm-project-tree.git',
         'D:/llvm-project.git')
 
 def AddCMake(factory, G,
@@ -274,11 +279,11 @@ def BuildStageNcyg(factory, n,
     if n != 3:
         factory.addStep(LitTestCommand(
                 name="test_clang",
-                command=["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"],
+                command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
                 workdir=workdir))
         factory.addStep(LitTestCommand(
                 name="test_llvm",
-                command=["make", "LIT_ARGS=-v -j1", "check"],
+                command=["make", "LIT_ARGS=-v -j8", "check"],
                 workdir=workdir))
 
     factory.addStep(Compile(
@@ -299,6 +304,25 @@ def BuildStageNcyg(factory, n,
                 workdir,
                 "%s/stage%d" % (root, n)],
             workdir="."))
+
+def Compare23(factory, warn=True):
+    factory.addStep(Compile(
+            name="compare_23",
+            description="Comparing",
+            descriptionDone="Compare-2-3",
+            command=[
+                "find",
+                "!", "-wholename", "*/test/*",
+                "-type", "f",
+                "-name", "*.o",
+                "!", "-name", "llvm-config*",
+                "-exec",
+                "cmp", "../stage2/{}", "{}", ";",
+                ],
+            warningPattern=r'^.*\sdiffer:\s',
+            warnOnWarnings = warn,
+            workdir="builds/stage3",
+            ))
 
 def PatchLLVM(factory, name):
     factory.addStep(ShellCommand(descriptionDone="LLVM Local Patch",
@@ -322,188 +346,44 @@ def PatchLLVMClang(factory, name):
 
 def BlobPre(factory):
     factory.addStep(ShellCommand(
-            command=[
-                "sh", "-c",
-                "mkdir -p build install",
-                ],
-            flunkOnFailure=False,
-            workdir="."))
-    factory.addStep(ShellCommand(
-            name="blob-prebuild-add",
+            name="blob-prebuild",
             description="Adding prebuild blob",
             descriptionDone="Added prebuild blob",
             command=[
-                "git", "--git-dir=blob.git", "--work-tree=.",
-                "add", "-A", "--ignore-errors",
-                "build",
-                "install",
-                ],
-            flunkOnFailure=False,
-            alwaysRun=True,
-            workdir=".",
-            ))
-    factory.addStep(ShellCommand(
-            name="blob-prebuild-commit",
-            description="Committing prebuild blob",
-            descriptionDone="Committed prebuild-blob",
-            command=[
-                "git", "--git-dir=blob.git", "--work-tree=.",
-                "commit",
-                "-m",
-                WithProperties("%(buildnumber)s-prebuild"),
-                ],
-            flunkOnFailure=False,
-            alwaysRun=True,
-            timeout=3600,
-            workdir=".",
-            ))
-    factory.addStep(ShellCommand(
-            command=[
                 "sh", "-c",
-                "../mkref",
+                WithProperties("../blob.pl branch=%(branch)s buildnumber=%(buildnumber)s"),
                 ],
             flunkOnFailure=False,
             workdir="."))
 
 def BlobPost(factory):
-    factory.addStep(ShellCommand(
+    factory.addStep(SetProperty(
+            name="build_successful_init",
             command=[
                 "sh", "-c",
-                "mkdir -p build install",
-                ],
+                "echo NG"],
+            alwaysRun=True,
             flunkOnFailure=False,
-            workdir="."))
-    factory.addStep(ShellCommand(
+            property="build_successful"))
+    factory.addStep(SetProperty(
+            name="build_successful",
             command=[
-                "chmod", "-R", "u+r",
-                "build",
-                ],
+                "sh", "-c",
+                "echo OK"],
             flunkOnFailure=False,
-            workdir="."))
+            property="build_successful"))
     factory.addStep(ShellCommand(
             name="blob-add",
             description="Adding blob",
             descriptionDone="Added blob",
             command=[
-                "git", "--git-dir=blob.git", "--work-tree=.",
-                "add", "-A", "--ignore-errors",
-                "build",
-                "install",
-                ],
-            flunkOnFailure=False,
-            warnOnFailure=True,
-            alwaysRun=True,
-            workdir=".",
-            ))
-    factory.addStep(ShellCommand(
-            name="blob-commit",
-            description="Committing blob",
-            descriptionDone="Committed blob",
-            command=[
-                "git", "--git-dir=blob.git", "--work-tree=.",
-                "commit",
-                "--allow-empty",
-                "-m",
-                WithProperties("%(buildnumber)s-%(got_revision)s"),
-                ],
-            flunkOnFailure=False,
-            warnOnFailure=True,
-            alwaysRun=True,
-            timeout=3600,
-            workdir=".",
-            ))
-
-def BlobPre3(factory):
-    factory.addStep(ShellCommand(
-            command=[
-                "mkdir", "-p",
-                "build",
-                "builds",
-                ],
-            flunkOnFailure=False,
-            workdir="."))
-    factory.addStep(ShellCommand(
-            name="blob-prebuild-add",
-            description="Adding prebuild blob",
-            descriptionDone="Added prebuild blob",
-            command=[
-                "git", "--git-dir=blob.git", "--work-tree=.",
-                "add", "-A", "--ignore-errors",
-                "build", "builds",
-                ],
-            flunkOnFailure=False,
-            alwaysRun=True,
-            workdir=".",
-            ))
-    factory.addStep(ShellCommand(
-            name="blob-prebuild-commit",
-            description="Committing prebuild blob",
-            descriptionDone="Committed prebuild-blob",
-            command=[
-                "git", "--git-dir=blob.git", "--work-tree=.",
-                "commit",
-                "-m",
-                WithProperties("%(buildnumber)s-prebuild"),
-                ],
-            flunkOnFailure=False,
-            alwaysRun=True,
-            timeout=3600,
-            workdir=".",
-            ))
-    factory.addStep(ShellCommand(
-            command=[
                 "sh", "-c",
-                "../mkref",
+                WithProperties("../blob.pl build_successful=%(build_successful)s branch=%(branch)s got_revision=%(got_revision)s buildnumber=%(buildnumber)s warnings-count=%(warnings-count)s"),
                 ],
             flunkOnFailure=False,
-            workdir="."))
-
-def BlobPost3(factory):
-    factory.addStep(ShellCommand(
-            command=[
-                "mkdir", "-p",
-                "build",
-                "builds",
-                ],
-            flunkOnFailure=False,
-            workdir="."))
-    factory.addStep(ShellCommand(
-            command=[
-                "chmod", "-Rf", "u+r",
-                "build", "builds",
-                ],
-            flunkOnFailure=False,
-            workdir="."))
-    factory.addStep(ShellCommand(
-            name="blob-add",
-            description="Adding blob",
-            descriptionDone="Added blob",
-            command=[
-                "git", "--git-dir=blob.git", "--work-tree=.",
-                "add", "-A", "--ignore-errors", "build", "builds",
-                ],
-            flunkOnFailure=False,
-            warnOnFailure=True,
             alwaysRun=True,
-            workdir=".",
-            ))
-    factory.addStep(ShellCommand(
-            name="blob-commit",
-            description="Committing blob",
-            descriptionDone="Committed blob",
-            command=[
-                "git", "--git-dir=blob.git", "--work-tree=.",
-                "commit",
-                "--allow-empty",
-                "-m",
-                WithProperties("%(buildnumber)s-%(got_revision)s"),
-                ],
-            flunkOnFailure=False,
-            warnOnFailure=True,
             timeout=3600,
-            alwaysRun=True,
-            workdir=".",
-            ))
+            workdir="."))
 
 def get_builders():
 
@@ -678,7 +558,7 @@ def get_builders():
     AddGitLLVMTree(factory,
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
-    BlobPre3(factory)
+    BlobPre(factory)
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
     #PatchLLVMClang(factory, "llvmclang.diff")
@@ -712,7 +592,7 @@ def get_builders():
     BuildStageN8(factory, 3)
 
     # Trail
-    BlobPost3(factory)
+    BlobPost(factory)
     # factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
     #                                 flunkOnFailure=False))
     # factory.addStep(ShellCommand(name="save_builds",
@@ -720,17 +600,9 @@ def get_builders():
     #                                       "builds",
     #                                       "last"],
     #                              workdir="."))
-    factory.addStep(ShellCommand(name="compare_23",
-                                 description="Comparing",
-                                 descriptionDone="Compare-2-3",
-                                 command=["find",
-                                          "!", "-wholename", "*/test/*",
-                                          "-type", "f",
-                                          "-name", "*.o",
-                                          "!", "-name", "llvm-config*",
-                                          "-exec",
-                                          "cmp", "../stage2/{}", "{}", ";"],
-                                 workdir="builds/stage3"))
+    Compare23(
+        factory,
+        )
     yield BuilderConfig(name="clang-3stage-x86_64-linux",
                         slavenames=["centos6"],
                         mergeRequests=True,
@@ -740,10 +612,10 @@ def get_builders():
     # Cygwin(3stage)
     factory = BuildFactory()
     AddGitLLVMTree(factory,
-                    'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
+                    'git://192.168.1.199/var/cache/llvm-project-tree.git',
                     '/cygdrive/d/llvm-project.git')
     PatchLLVMClang(factory, "llvmclang.diff")
-    BlobPre3(factory)
+    BlobPre(factory)
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/llvm-project/clang/test/Index"),
@@ -781,14 +653,14 @@ def get_builders():
                             command=["make", "-k"]))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
-            command         = ["make", "LIT_ARGS=-v -j1", "check"],
+            command         = ["make", "LIT_ARGS=-v -j8", "check"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
                                     flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
-            command         = ["make", "TESTARGS=-v -j1", "-C", "tools/clang/test"],
+            command         = ["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
             flunkOnFailure  = False,
             warnOnWarnings = False,
             flunkOnWarnings = False,
@@ -804,7 +676,7 @@ def get_builders():
     BuildStageNcyg(factory, 3)
 
     # Trail
-    BlobPost3(factory)
+    BlobPost(factory)
     # factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
     #                                 flunkOnFailure=False))
     # factory.addStep(ShellCommand(name="save_builds",
@@ -812,17 +684,10 @@ def get_builders():
     #                                       "builds",
     #                                       "last"],
     #                              workdir="."))
-    factory.addStep(ShellCommand(name="compare_23",
-                                 description="Comparing",
-                                 descriptionDone="Compare-2-3",
-                                 command=["find",
-                                          "!", "-wholename", "*/test/*",
-                                          "-type", "f",
-                                          "-name", "*.o",
-                                          "!", "-name", "llvm-config*",
-                                          "-exec",
-                                          "cmp", "../stage2/{}", "{}", ";"],
-                                 workdir="builds/stage3"))
+    Compare23(
+        factory,
+        warn=False,
+        )
     yield BuilderConfig(name="clang-3stage-cygwin",
                         slavenames=["cygwin"],
                         mergeRequests=True,
@@ -831,28 +696,29 @@ def get_builders():
     # PS3
     factory = BuildFactory()
     # check out the source
-    factory.addStep(ShellCommand(name="git-fetch",
-                                 command=["git",
-                                          "--git-dir", "/home/chapuni/llvm-project.git",
-                                          "fetch", "origin", "--prune"],
-                                 timeout=3600,
-                                 flunkOnFailure=False));
+    # factory.addStep(ShellCommand(name="git-fetch",
+    #                              command=["git",
+    #                                       "--git-dir", "/home/chapuni/llvm-project.git",
+    #                                       "fetch", "origin", "--prune"],
+    #                              timeout=3600,
+    #                              flunkOnFailure=False));
     AddGitLLVMTree(factory,
-                   'chapuni@192.168.1.199:/var/cache/llvm-project-tree.git',
-                   '/home/chapuni/llvm-project.git')
+                   'git://192.168.1.199/var/cache/llvm-project-tree.git',
+                   None)
     PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory)
     factory.addStep(ShellCommand(
             command=[
                 "../llvm-project/llvm/configure",
-                "-C",
+                #"-C",
                 "CC=ccache gcc",
                 "CXX=ccache g++",
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "--enable-optimized",
                 "--with-optimize-option=-O3 -UPPC",
                 "--build=ppc-redhat-linux"],
-            doStepIf=Makefile_not_ready))
+            #doStepIf=Makefile_not_ready,
+            ))
     factory.addStep(ShellCommand(command=["./config.status", "--recheck"],
                                  doStepIf=sample_needed_update,
                                  workdir="build/projects/sample"))
@@ -870,9 +736,9 @@ def get_builders():
                                     flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
-            flunkOnFailure=False,
-            warnOnWarnings=False,
-            flunkOnWarnings=False,
+#            flunkOnFailure=False,
+#            warnOnWarnings=False,
+#            flunkOnWarnings=False,
             command=["make", "TESTARGS=-v", "-C", "tools/clang/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
@@ -906,7 +772,8 @@ def get_builders():
             command=[
                 "sh", "-c",
                 WithProperties("PATH=/bin:$PATH PWD=%(workdir_msys)s/build %(workdir_msys)s/llvm-project/llvm/configure -C --enable-optimized --disable-pthreads --with-clang-srcdir=%(workdir_msys)s/llvm-project/clang --disable-docs --prefix=%(workdir_msys)s/install")],
-            doStepIf=Makefile_not_ready))
+            doStepIf=Makefile_not_ready,
+            ))
     factory.addStep(ShellCommand(command=["sh", "-c",
                                           "./config.status --recheck"],
                                  doStepIf=sample_needed_update,
@@ -993,6 +860,7 @@ def get_builders():
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
+            locks = [win7_cyg_lock.access('exclusive')],
             command=["c:/Python27/python.exe",
                      "../llvm-project/llvm/utils/lit/lit.py",
                      "--param", "build_config=.",
@@ -1009,6 +877,7 @@ def get_builders():
                      "tools/clang/tools/extra/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
+            locks = [win7_cyg_lock.access('exclusive')],
             command=["c:/Python27/python.exe",
                      "../llvm-project/llvm/utils/lit/lit.py",
                      "--param", "build_config=.",
@@ -1067,6 +936,7 @@ def get_builders():
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
+            locks = [win7_cyg_lock.access('exclusive')],
             command=["c:/Python27/python.exe",
                      "../llvm-project/llvm/utils/lit/lit.py",
                      "--param", "build_config=Release",
@@ -1075,6 +945,7 @@ def get_builders():
                      "tools/clang/test"]))
     factory.addStep(LitTestCommand(
             name="test_extra",
+            locks = [win7_cyg_lock.access('exclusive')],
             command=["c:/Python27/python.exe",
                      "../llvm-project/llvm/utils/lit/lit.py",
                      "--param", "build_config=Release",
@@ -1083,6 +954,7 @@ def get_builders():
                      "tools/clang/tools/extra/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
+            locks = [win7_cyg_lock.access('exclusive')],
             command=["c:/Python27/python.exe",
                      "../llvm-project/llvm/utils/lit/lit.py",
                      "--param", "build_config=Release",
