@@ -16,7 +16,7 @@ def Tllvmlib(l):
     return filter_t(l, r'^llvm/(include|lib|tools|utils)/')
 def Fllvmtest(l): return filter_f(l, r'^llvm/test/.+/')
 def Fhtml(l): return filter_f(l, r'\.(TXT|html|rst)(\.\w)?$')
-def FGNUmake(l): return filter_f(l, r'/Makefile(\.\w+)$')
+def FGNUmake(l): return filter_f(l, r'/Makefile(\.\w+)?$')
 def Fautoconf(l): return filter_f(FGNUmake(l), r'^llvm/autoconf/')
 def Fcmakefiles(l): return filter_f(l, r'/CMakeLists\.txt$')
 def Fcmake(l): return filter_f(Fcmakefiles(l), r'^llvm/cmake/')
@@ -88,7 +88,7 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="notquick5",
         change_filter = change_cmake_llvmclang,
-        treeStableTimer=15 * 60,
+        treeStableTimer=10 * 60,
         builderNames=[
             "cmake-clang-i686-msvc10",
 #            "cmake-clang-i686-msvc9",
@@ -109,13 +109,20 @@ def get_schedulers():
             ])
 
     yield AnyBranchScheduler(
+        name="notquick_autoconf",
+        change_filter = change_autoconf_llvmclang,
+        treeStableTimer=5 * 60,
+        builderNames=[
+            "clang-ppc-linux",
+            ])
+
+    yield AnyBranchScheduler(
         name="stable_autoconf",
         change_filter = change_autoconf_llvmclang,
         treeStableTimer=60 * 60,
         builderNames=[
             "clang-3stage-cygwin",
             "clang-i686-msys",
-            "clang-ppc-linux",
             ])
 
 #EOF

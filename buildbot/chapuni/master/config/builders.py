@@ -198,6 +198,7 @@ def BuildStageN8(factory, n,
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "--disable-timestamps",
                 "--disable-assertions",
+                "--with-optimize-option=-O3 -Wdocumentation -Wno-documentation-deprecated-sync",
                 "--enable-optimized"],
             name="configure",
             description="configuring",
@@ -205,7 +206,14 @@ def BuildStageN8(factory, n,
             workdir=workdir))
     factory.addStep(Compile(
             name="build",
-            command=["make", "VERBOSE=1", "-k", "-j8", "-l8.2"],
+            command=[
+                "make",
+                "VERBOSE=1",
+                "-k",
+                "-j8", "-l8.2",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                ],
             warnOnWarnings = True,
             workdir=workdir))
 
@@ -221,7 +229,13 @@ def BuildStageN8(factory, n,
 
     factory.addStep(Compile(
             name="install",
-            command=["make", "VERBOSE=1", "install", "-j8"],
+            command=[
+                "make",
+                "VERBOSE=1",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "install",
+                "-j8"],
             workdir=workdir))
     factory.addStep(ShellCommand(
             name="install_fix",
@@ -254,27 +268,49 @@ def BuildStageNcyg(factory, n,
                 "LIBS=-static",
                 "--disable-timestamps",
                 "--disable-assertions",
+                "--with-optimize-option=-O3 -Wdocumentation -Wno-documentation-deprecated-sync",
                 "--enable-optimized"],
             name="configure",
             description="configuring",
             descriptionDone="Configure",
             workdir=workdir))
-    factory.addStep(Compile(name="make_quick",
-                            haltOnFailure = False,
-                            flunkOnFailure=False,
-                            warnOnWarnings = True,
-                            locks = [win7_cyg_lock.access('exclusive')],
-                            command=["make", "VERBOSE=1", "-k", "-j8"],
-                            workdir=workdir))
-    factory.addStep(Compile(name="make_quick_again",
-                            haltOnFailure = False,
-                            warnOnWarnings = True,
-                            flunkOnFailure=False,
-                            command=["make", "VERBOSE=1", "-k", "-j8"],
-                            workdir=workdir))
-    factory.addStep(Compile(command=["make", "VERBOSE=1", "-k", "-j1"],
-                            warnOnWarnings = True,
-                            workdir=workdir))
+    factory.addStep(Compile(
+            name="make_quick",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnWarnings = True,
+            locks = [win7_cyg_lock.access('exclusive')],
+            command=[
+                "make",
+                "VERBOSE=1",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "-k",
+                "-j8"],
+            workdir=workdir))
+    factory.addStep(Compile(
+            name="make_quick_again",
+            haltOnFailure = False,
+            warnOnWarnings = True,
+            flunkOnFailure=False,
+            command=[
+                "make",
+                "VERBOSE=1",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "-k",
+                "-j8"],
+            workdir=workdir))
+    factory.addStep(Compile(
+            command=[
+                "make",
+                "VERBOSE=1",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "-k",
+                "-j1"],
+            warnOnWarnings = True,
+            workdir=workdir))
 
     if n != 3:
         factory.addStep(LitTestCommand(
@@ -288,7 +324,13 @@ def BuildStageNcyg(factory, n,
 
     factory.addStep(Compile(
             name="install",
-            command=["make", "VERBOSE=1", "install", "-j1"],
+            command=[
+                "make",
+                "VERBOSE=1",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "install",
+                "-j1"],
             workdir=workdir))
     factory.addStep(ShellCommand(
             name="install_fix",
@@ -354,6 +396,7 @@ def BlobPre(factory):
                 WithProperties("../blob.pl branch=%(branch)s buildnumber=%(buildnumber)s"),
                 ],
             flunkOnFailure=False,
+            timeout=3600,
             workdir="."))
 
 def BlobPost(factory):
@@ -421,6 +464,7 @@ def get_builders():
     AddCMakeCentOS6(
         factory, buildClang=False,
         LLVM_BUILD_EXAMPLES="ON",
+        LLVM_EXPERIMENTAL_TARGETS_TO_BUILD="R600",
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             command         = ["make", "-j8", "-k"],
@@ -561,7 +605,7 @@ def get_builders():
     BlobPre(factory)
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
-    #PatchLLVMClang(factory, "llvmclang.diff")
+    PatchLLVMClang(factory, "llvmclang.diff")
     AddCMakeCentOS6(factory,
                     LLVM_TARGETS_TO_BUILD="X86",
                     LLVM_ENABLE_ASSERTIONS="ON",
@@ -715,7 +759,7 @@ def get_builders():
                 "CXX=ccache g++",
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "--enable-optimized",
-                "--with-optimize-option=-O3 -UPPC",
+                "--with-optimize-option=-O1 -UPPC",
                 "--build=ppc-redhat-linux"],
             #doStepIf=Makefile_not_ready,
             ))
@@ -732,8 +776,12 @@ def get_builders():
                      ],
             timeout=2 * 60 * 60,
             ))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
-                                    flunkOnFailure=False))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+            flunkOnFailure=False))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Analysis/Output"),
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
 #            flunkOnFailure=False,

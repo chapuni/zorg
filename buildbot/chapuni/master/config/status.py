@@ -49,7 +49,9 @@ def get_status_targets(standard_builders):
             allowForce = True,
             notify_events={
                 'successToFailure': 1,
+                'warningsToFailure': 1,
                 'failureToSuccess': 1,
+                'warningsToSuccess': 1,
                 'exceptionToSuccess': 1,
                 }),
         buildbot.status.words.IRC(
@@ -58,7 +60,9 @@ def get_status_targets(standard_builders):
             allowForce = True,
             notify_events={
                 'successToFailure': 1,
+                'warningsToFailure': 1,
                 'failureToSuccess': 1,
+                'warningsToSuccess': 1,
                 'exceptionToSuccess': 1,
                 'exception': 1,
                 }),
