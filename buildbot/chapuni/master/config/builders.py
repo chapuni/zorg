@@ -383,19 +383,6 @@ def Compare23(factory, warn=True):
             workdir="builds/stage3",
             ))
 
-def PatchLLVM(factory, name):
-    factory.addStep(ShellCommand(descriptionDone="LLVM Local Patch",
-                                 command=["sh", "-c",
-                                          "patch -p1 -N < ../../" + name],
-                                 flunkOnFailure=False,
-                                 workdir="llvm-project/llvm"))
-def PatchClang(factory, name):
-    factory.addStep(ShellCommand(descriptionDone="Clang Local Patch",
-                                 command=["sh", "-c",
-                                          "patch -p1 -N < ../../../../" + name],
-                                 flunkOnFailure=False,
-                                 workdir="llvm-project/llvm/tools/clang"))
-
 def PatchLLVMClang(factory, name):
     factory.addStep(ShellCommand(descriptionDone="llvm-project Local Patch",
                                  command=["sh", "-c",
@@ -841,9 +828,6 @@ def get_builders():
     # autoconf-msys
     factory = BuildFactory()
     AddGitWin7(factory)
-#    PatchLLVM(factory, "makefile.patch")
-#    PatchLLVM(factory, "llvm.patch")
-#    PatchClang(factory, "clang.patch")
     PatchLLVMClang(factory, "llvmclang.diff")
     factory.addStep(SetProperty(name="get_msys_path",
                                 command=["sh", "-c", "PWD= sh pwd"],
