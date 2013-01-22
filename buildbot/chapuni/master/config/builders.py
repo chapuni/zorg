@@ -129,6 +129,19 @@ def AddCMakeCentOS6(factory,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
 
+def AddCMakeCentOS6Ninja(factory,
+                         LLVM_TARGETS_TO_BUILD="all",
+                         LLVM_LIT_ARGS="-v",
+                         **kwargs):
+    AddCMake(
+        factory, "Ninja",
+        CMAKE_C_COMPILER="/home/bb/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_BUILD_TYPE="Release",
+        LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
+        LLVM_LIT_ARGS=LLVM_LIT_ARGS,
+        **kwargs)
+
 def AddCMakeDOS(factory, G, **kwargs):
     AddCMake(factory, G,
              LLVM_TARGETS_TO_BUILD="all",
@@ -464,8 +477,8 @@ def get_builders():
 
     BlobPre(factory)
 
-    CheckMakefile(factory)
-    AddCMakeCentOS6(
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeCentOS6Ninja(
         factory, buildClang=False,
         LLVM_BUILD_EXAMPLES="ON",
         LLVM_EXPERIMENTAL_TARGETS_TO_BUILD="R600",
@@ -473,7 +486,7 @@ def get_builders():
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             name            = 'build_llvm',
-            command         = ["make", "-j8", "check-llvm"],
+            command         = ["ninja", "check-all"],
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
     factory.addStep(LitTestCommand(
@@ -487,7 +500,7 @@ def get_builders():
             descriptionDone = ["test",    "llvm"]))
     factory.addStep(Compile(
             name            = 'build_all',
-            command         = ["make", "-j8"],
+            command         = ["ninja"],
             description     = ["building", "all"],
             descriptionDone = ["built",    "all"]))
 
@@ -528,25 +541,38 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
-    CheckMakefile(factory)
-    AddCMakeCentOS6(
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeCentOS6Ninja(
         factory,
         LLVM_BUILD_EXAMPLES="OFF",
         LLVM_BUILD_RUNTIME="OFF",
         LLVM_BUILD_TESTS="OFF",
         LLVM_BUILD_TOOLS="OFF",
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
         CLANG_BUILD_EXAMPLES="ON",
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
-            command         = ["make", "-j8", "-k"],
-            locks           = [centos6_lock.access('counting')],
-            name            = 'build_clang'))
+            name            = 'build_clang',
+            command         = ["ninja", "check-all"],
+            description     = ["building", "clang"],
+            descriptionDone = ["built",    "clang"]))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
-            command         = ["make", "-j8", "check-all"],
+            command         = [
+                "bin/llvm-lit",
+                "-v",
+                "tools/clang/test",
+                "tools/clang/tools/extra/test",
+                ],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
+    factory.addStep(Compile(
+            name            = 'build_all',
+            command         = ["ninja"],
+            description     = ["building", "all"],
+            descriptionDone = ["built",    "all"]))
+
     BlobPost(factory)
     yield BuilderConfig(name="cmake-clang-x86_64-linux",
                         slavenames=["centos6"],
