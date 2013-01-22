@@ -142,10 +142,12 @@ def AddCMakeCentOS6Ninja(factory,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
 
-def AddCMakeDOS(factory, G, **kwargs):
+def AddCMakeDOS(factory, G,
+                LLVM_LIT_ARGS="-v",
+                **kwargs):
     AddCMake(factory, G,
              LLVM_TARGETS_TO_BUILD="all",
-             LLVM_LIT_ARGS="-v",
+             LLVM_LIT_ARGS=LLVM_LIT_ARGS,
              LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
              **kwargs)
 
@@ -922,44 +924,74 @@ def get_builders():
         CMAKE_MAKE_PROGRAM=ninja,
         LLVM_ENABLE_ASSERTIONS="ON",
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_BUILD_EXAMPLES="ON",
         CLANG_BUILD_EXAMPLES="ON",
         doStepIf=Makefile_not_ready)
+
     factory.addStep(Compile(
-            command=[ninja, "install", "-j8"],
+            name            = 'build_llvm',
             locks = [win7_cyg_lock.access('exclusive')],
-            ))
+            command         = [ninja, "check-llvm"],
+            description     = ["building", "llvm"],
+            descriptionDone = ["built",    "llvm"]))
+    factory.addStep(LitTestCommand(
+            name            = 'test_llvm',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [
+                "c:/Python27/python.exe",
+                "bin/llvm-lit",
+                "-v",
+                "test",
+                ],
+            description     = ["testing", "llvm"],
+            descriptionDone = ["test",    "llvm"]))
+
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-clang-tools"],
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
+    factory.addStep(LitTestCommand(
+            name            = 'test_clang_tools',
+            command         = [
+                "c:/Python27/python.exe",
+                "bin/llvm-lit",
+                "-v",
+                "tools/clang/tools/extra/test",
+                ],
+            description     = ["testing", "tools"],
+            descriptionDone = ["test",    "tools"]))
+
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
                 WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
-    factory.addStep(LitTestCommand(
-            name="test_clang",
+    factory.addStep(Compile(
+            name            = 'build_clang',
             locks = [win7_cyg_lock.access('exclusive')],
-            command=["c:/Python27/python.exe",
-                     "../llvm-project/llvm/utils/lit/lit.py",
-                     "--param", "build_config=.",
-                     "--param", "build_mode=Release",
-                     "-v",
-                     "tools/clang/test"]))
+            command         = [ninja, "check-clang"],
+            description     = ["building", "clang"],
+            descriptionDone = ["built",    "clang"]))
     factory.addStep(LitTestCommand(
-            name="test_clang_extra",
-            command=["c:/Python27/python.exe",
-                     "../llvm-project/llvm/utils/lit/lit.py",
-                     "--param", "build_config=.",
-                     "--param", "build_mode=Release",
-                     "-v",
-                     "tools/clang/tools/extra/test"]))
-    factory.addStep(LitTestCommand(
-            name="test_llvm",
+            name            = 'test_clang',
             locks = [win7_cyg_lock.access('exclusive')],
-            command=["c:/Python27/python.exe",
-                     "../llvm-project/llvm/utils/lit/lit.py",
-                     "--param", "build_config=.",
-                     "--param", "build_mode=Release",
-                     "-v",
-                     "test"]))
+            command         = [
+                "c:/Python27/python.exe",
+                "bin/llvm-lit",
+                "-v",
+                "tools/clang/test",
+                ],
+            description     = ["testing", "clang"],
+            descriptionDone = ["test",    "clang"]))
+
+    factory.addStep(Compile(
+            command=[ninja, "install", "-j8"],
+            locks = [win7_cyg_lock.access('exclusive')],
+            ))
+
     BlobPost(factory)
     yield BuilderConfig(name="cmake-clang-i686-mingw32",
                         mergeRequests=True,
