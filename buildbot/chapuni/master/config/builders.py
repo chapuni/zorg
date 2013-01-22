@@ -947,23 +947,6 @@ def get_builders():
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
 
-    factory.addStep(Compile(
-            name            = 'build_clang_tools',
-            locks = [win7_cyg_lock.access('exclusive')],
-            command         = [ninja, "check-clang-tools"],
-            description     = ["building", "tools"],
-            descriptionDone = ["built",    "tools"]))
-    factory.addStep(LitTestCommand(
-            name            = 'test_clang_tools',
-            command         = [
-                "c:/Python27/python.exe",
-                "bin/llvm-lit",
-                "-v",
-                "tools/clang/tools/extra/test",
-                ],
-            description     = ["testing", "tools"],
-            descriptionDone = ["test",    "tools"]))
-
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
@@ -986,6 +969,23 @@ def get_builders():
                 ],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
+
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-clang-tools"],
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
+    factory.addStep(LitTestCommand(
+            name            = 'test_clang_tools',
+            command         = [
+                "c:/Python27/python.exe",
+                "bin/llvm-lit",
+                "-v",
+                "tools/clang/tools/extra/test",
+                ],
+            description     = ["testing", "tools"],
+            descriptionDone = ["test",    "tools"]))
 
     factory.addStep(Compile(
             command=[ninja, "install", "-j8"],
