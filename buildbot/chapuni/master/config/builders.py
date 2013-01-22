@@ -545,11 +545,13 @@ def get_builders():
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             name            = 'build_clang',
+            locks           = [centos6_lock.access('counting')],
             command         = ["ninja", "check-all"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
+            locks           = [centos6_lock.access('counting')],
             command         = [
                 "bin/llvm-lit",
                 "-v",
@@ -559,6 +561,7 @@ def get_builders():
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
     factory.addStep(Compile(
+            locks           = [centos6_lock.access('counting')],
             name            = 'build_all',
             command         = ["ninja"],
             description     = ["building", "all"],
