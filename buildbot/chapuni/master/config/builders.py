@@ -464,6 +464,7 @@ def get_builders():
 
     BlobPre(factory)
 
+    PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     AddCMakeCentOS6Ninja(
         factory, buildClang=False,
@@ -528,6 +529,7 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     AddCMakeCentOS6Ninja(
         factory,
