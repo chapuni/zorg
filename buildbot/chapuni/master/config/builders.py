@@ -117,13 +117,17 @@ def AddCMakeCentOS5(factory,
 
 def AddCMakeCentOS6(factory,
                     LLVM_TARGETS_TO_BUILD="all",
+                    LLVM_LIT_ARGS="-v",
                     **kwargs):
-    AddCMake(factory, "Unix Makefiles",
-             CMAKE_COLOR_MAKEFILE="OFF",
-             CMAKE_BUILD_TYPE="Release",
-             LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
-             LLVM_LIT_ARGS="-v",
-             **kwargs)
+    AddCMake(
+        factory, "Unix Makefiles",
+        CMAKE_COLOR_MAKEFILE="OFF",
+        CMAKE_C_COMPILER="/home/bb/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_BUILD_TYPE="Release",
+        LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
+        LLVM_LIT_ARGS=LLVM_LIT_ARGS,
+        **kwargs)
 
 def AddCMakeDOS(factory, G, **kwargs):
     AddCMake(factory, G,
@@ -465,15 +469,27 @@ def get_builders():
         factory, buildClang=False,
         LLVM_BUILD_EXAMPLES="ON",
         LLVM_EXPERIMENTAL_TARGETS_TO_BUILD="R600",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
-            command         = ["make", "-j8", "-k"],
-            name            = 'build_llvm'))
+            name            = 'build_llvm',
+            command         = ["make", "-j8", "check-llvm"],
+            description     = ["building", "llvm"],
+            descriptionDone = ["built",    "llvm"]))
     factory.addStep(LitTestCommand(
             name            = 'test_llvm',
-            command         = ["make", "-j8", "check-llvm"],
+            command         = [
+                "bin/llvm-lit",
+                "-v",
+                "test",
+                ],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
+    factory.addStep(Compile(
+            name            = 'build_all',
+            command         = ["make", "-j8"],
+            description     = ["building", "all"],
+            descriptionDone = ["built",    "all"]))
 
     BlobPost(factory)
 
