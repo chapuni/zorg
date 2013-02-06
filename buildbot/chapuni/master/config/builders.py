@@ -203,7 +203,8 @@ def BuildStageN(factory, n,
             workdir="."))
 
 def BuildStageN8(factory, n,
-                root="builds"):
+                 warn = True,
+                 root="builds"):
     instroot="%s/install" % root
     workdir="%s/stagen" % root
     tools="%s/stage%d/bin" % (instroot, n - 1)
@@ -233,7 +234,7 @@ def BuildStageN8(factory, n,
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 ],
-            warnOnWarnings = True,
+            warnOnWarnings = warn,
             workdir=workdir))
 
     if n != 3:
@@ -271,8 +272,10 @@ def BuildStageN8(factory, n,
                 "%s/stage%d" % (root, n)],
             workdir="."))
 
-def BuildStageNcyg(factory, n,
-                root="builds"):
+def BuildStageNcyg(
+    factory, n,
+    warn = True,
+    root="builds"):
     instroot="%s/install" % root
     workdir="%s/stagen" % root
     tools="%s/stage%d/bin" % (instroot, n - 1)
@@ -297,7 +300,7 @@ def BuildStageNcyg(factory, n,
             name="make_quick",
             haltOnFailure = False,
             flunkOnFailure=False,
-            warnOnWarnings = True,
+            warnOnWarnings = warn,
             locks = [win7_cyg_lock.access('exclusive')],
             command=[
                 "make",
@@ -310,7 +313,7 @@ def BuildStageNcyg(factory, n,
     factory.addStep(Compile(
             name="make_quick_again",
             haltOnFailure = False,
-            warnOnWarnings = True,
+            warnOnWarnings = warn,
             flunkOnFailure=False,
             command=[
                 "make",
@@ -328,7 +331,7 @@ def BuildStageNcyg(factory, n,
                 "RANLIB=echo",
                 "-k",
                 "-j1"],
-            warnOnWarnings = True,
+            warnOnWarnings = warn,
             workdir=workdir))
 
     if n != 3:
@@ -551,7 +554,7 @@ def get_builders():
             descriptionDone = ["built",    "clang"]))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
-            locks           = [centos6_lock.access('counting')],
+            #locks           = [centos6_lock.access('counting')],
             command         = [
                 "bin/llvm-lit",
                 "-v",
@@ -561,7 +564,7 @@ def get_builders():
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
     factory.addStep(Compile(
-            locks           = [centos6_lock.access('counting')],
+            #locks           = [centos6_lock.access('counting')],
             name            = 'build_all',
             command         = ["ninja"],
             description     = ["building", "all"],
@@ -669,7 +672,7 @@ def get_builders():
     BuildStageN8(factory, 2)
 
     # stage 3
-    BuildStageN8(factory, 3)
+    BuildStageN8(factory, 3, False)
 
     # Trail
     BlobPost(factory)
@@ -753,7 +756,7 @@ def get_builders():
     BuildStageNcyg(factory, 2)
 
     # stage 3
-    BuildStageNcyg(factory, 3)
+    BuildStageNcyg(factory, 3, warn = False)
 
     # Trail
     BlobPost(factory)
