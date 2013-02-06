@@ -80,16 +80,23 @@ def get_schedulers():
             "cmake-clang-x86_64-linux",
             ])
     yield AnyBranchScheduler(
-        name="notquick",
+        name="notquick1",
         change_filter = change_cmake_llvmclang,
-        treeStableTimer=30,
+        treeStableTimer=90,
         builderNames=[
-            "cmake-clang-i686-mingw32",
+            "ninja-clang-i686-msc17-R",
             ])
     yield AnyBranchScheduler(
         name="notquick5",
         change_filter = change_cmake_llvmclang,
-        treeStableTimer=10 * 60,
+        treeStableTimer=5 * 60,
+        builderNames=[
+            "cmake-clang-i686-mingw32",
+            ])
+    yield AnyBranchScheduler(
+        name="notquick20",
+        change_filter = change_cmake_llvmclang,
+        treeStableTimer=20 * 60,
         builderNames=[
             "cmake-clang-i686-msvc10",
 #            "cmake-clang-i686-msvc9",
@@ -131,6 +138,7 @@ def get_schedulers():
         builderNames=[
             "cmake-clang-x86_64-linux",
             "cmake-clang-i686-mingw32",
+            "ninja-clang-i686-msc17-R",
             "cmake-clang-i686-msvc10",
             "cmake-llvm-x86_64-linux",
             "clang-3stage-x86_64-linux",
