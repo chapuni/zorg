@@ -1,4 +1,5 @@
 from buildbot.schedulers.basic import AnyBranchScheduler
+from buildbot.schedulers.forcesched import *
 
 from buildbot.changes.filter import ChangeFilter
 
@@ -124,5 +125,51 @@ def get_schedulers():
             "clang-3stage-cygwin",
             "clang-i686-msys",
             ])
+
+    yield ForceScheduler(
+        name="force",
+        builderNames=[
+            "cmake-clang-x86_64-linux",
+            "cmake-clang-i686-mingw32",
+            "cmake-clang-i686-msvc10",
+            "cmake-llvm-x86_64-linux",
+            "clang-3stage-x86_64-linux",
+            "clang-ppc-linux",
+            "clang-3stage-cygwin",
+            "clang-i686-msys",
+            ],
+
+        # will generate a combo box
+        branch=StringParameter(name="branch", default="master"),
+        # branch=ChoiceStringParameter(name="branch",
+        #                              choices=["main","devel"], default="main"),
+
+        # will generate a text input
+        reason=StringParameter(name="reason",label="reason:<br>",
+                               required=False, size=80),
+
+        # will generate nothing in the form, but revision, repository,
+        # and project are needed by buildbot scheduling system so we
+        # need to pass a value ("")
+        revision=StringParameter(name="revision", required=True,default=""),
+        repository=FixedParameter(name="repository", default=""),
+        project=FixedParameter(name="project", default="llvm-project"),
+
+        # in case you dont require authentication this will display
+        # input for user to type his name
+        # username=UserNameParameter(label="your name:<br>", size=80),
+
+        # A completely customized property list.  The name of the
+        # property is the name of the parameter
+        # properties=[
+
+        #     BooleanParameter(name="force_build_clean",
+        #                      label="force a make clean", default=False),
+
+        #     StringParameter(name="pull_url",
+        #                     label="optionally give a public git pull url:<br>",
+        #                     default="", size=80)
+        #     ]
+        )
 
 #EOF
