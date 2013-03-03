@@ -241,11 +241,15 @@ def BuildStageN8(factory, n,
         factory.addStep(LitTestCommand(
                 name="test_clang",
                 command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
-                workdir=workdir))
+                workdir=workdir,
+                timeout=60,
+                ))
         factory.addStep(LitTestCommand(
                 name="test_llvm",
                 command=["make", "LIT_ARGS=-v -j8", "check"],
-                workdir=workdir))
+                timeout=60,
+                workdir=workdir,
+                ))
 
     factory.addStep(Compile(
             name="install",
@@ -490,7 +494,9 @@ def get_builders():
                 "test",
                 ],
             description     = ["testing", "llvm"],
-            descriptionDone = ["test",    "llvm"]))
+            descriptionDone = ["test",    "llvm"],
+            timeout=60,
+            ))
     factory.addStep(Compile(
             name            = 'build_all',
             command         = ["ninja"],
@@ -562,7 +568,9 @@ def get_builders():
                 "tools/clang/tools/extra/test",
                 ],
             description     = ["testing", "clang"],
-            descriptionDone = ["test",    "clang"]))
+            descriptionDone = ["test",    "clang"],
+            timeout=60,
+            ))
     factory.addStep(Compile(
             #locks           = [centos6_lock.access('counting')],
             name            = 'build_all',
@@ -657,14 +665,18 @@ def get_builders():
             name            = 'stage1_test_llvm',
             command         = ["make", "-j8", "-k", "check-llvm"],
             description     = ["testing", "llvm"],
-            descriptionDone = ["test",    "llvm"]))
+            descriptionDone = ["test",    "llvm"],
+            timeout=60,
+            ))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
                                     flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "-j8", "-k", "check-clang"],
             description     = ["testing", "clang"],
-            descriptionDone = ["test",    "clang"]))
+            descriptionDone = ["test",    "clang"],
+            timeout=60,
+            ))
     factory.addStep(Compile(name="stage1_install",
                             command=["make", "install", "-k", "-j8"]))
 
@@ -1020,10 +1032,16 @@ def get_builders():
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_BUILD_EXAMPLES="ON",
         CLANG_BUILD_EXAMPLES="ON",
-        CMAKE_C_COMPILER="cl",
-        CMAKE_CXX_COMPILER="cl",
+        CMAKE_C_COMPILER="D:/Program Files (x86)/Microsoft Visual Studio 11.0/VC/bin/cl.exe",
+        CMAKE_CXX_COMPILER="D:/Program Files (x86)/Microsoft Visual Studio 11.0/VC/bin/cl.exe",
         doStepIf=Makefile_not_ready)
 
+    factory.addStep(Compile(
+            name            = 'build_llvm',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-llvm"],
+            description     = ["building", "llvm"],
+            descriptionDone = ["built",    "llvm"]))
     factory.addStep(Compile(
             name            = 'build_llvm',
             locks = [win7_cyg_lock.access('exclusive')],
@@ -1053,6 +1071,12 @@ def get_builders():
             command         = [ninja, "check-clang"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
+    factory.addStep(Compile(
+            name            = 'build_clang',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-clang"],
+            description     = ["building", "clang"],
+            descriptionDone = ["built",    "clang"]))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
             locks = [win7_cyg_lock.access('exclusive')],
@@ -1071,6 +1095,12 @@ def get_builders():
             command         = [ninja, "check-clang-tools"],
             description     = ["building", "tools"],
             descriptionDone = ["built",    "tools"]))
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            #locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-clang-tools"],
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
     factory.addStep(LitTestCommand(
             name            = 'test_clang_tools',
             command         = [
@@ -1082,6 +1112,10 @@ def get_builders():
             description     = ["testing", "tools"],
             descriptionDone = ["test",    "tools"]))
 
+    factory.addStep(Compile(
+            command=[ninja],
+            #locks = [win7_cyg_lock.access('exclusive')],
+            ))
     factory.addStep(Compile(
             command=[ninja, "install"],
             #locks = [win7_cyg_lock.access('exclusive')],
@@ -1095,7 +1129,87 @@ def get_builders():
         env={
             'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
             'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
-            'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH}',
+            'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};E:\bb-win7',
+            },
+        factory=factory)
+
+    # msc16 x64
+    msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
+    factory = BuildFactory()
+    AddGitWin7(factory)
+    BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj")
+    AddCMakeDOS(
+        factory, "Visual Studio 10 Win64",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(name="zero_check",
+                            haltOnFailure = False,
+                            flunkOnFailure=False,
+                            warnOnFailure=True,
+                            timeout=3600,
+                            command=[msbuild,
+                                     "-m",
+                                     "-v:m",
+                                     "-p:Configuration=Release",
+                                     "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(name="all_build_quick",
+                            haltOnFailure = False,
+                            flunkOnFailure=False,
+                            timeout=3600,
+                            locks = [win7_cyg_lock.access('exclusive')],
+                            command=[msbuild,
+                                     "-m",
+                                     "-v:m",
+                                     "-p:Configuration=Release",
+                                     "ALL_BUILD.vcxproj"]))
+    factory.addStep(Compile(name="install",
+                            command=[msbuild,
+                                     "-m",
+                                     "-v:m",
+                                     "-p:Configuration=Release",
+                                     "INSTALL.vcxproj"]))
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+            flunkOnFailure=False))
+    factory.addStep(LitTestCommand(
+            name="test_clang",
+            locks = [win7_cyg_lock.access('exclusive')],
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=Release",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "tools/clang/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_extra",
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=Release",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "tools/clang/tools/extra/test"]))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            locks = [win7_cyg_lock.access('exclusive')],
+            command=["c:/Python27/python.exe",
+                     "../llvm-project/llvm/utils/lit/lit.py",
+                     "--param", "build_config=Release",
+                     "--param", "build_mode=Release",
+                     "-v",
+                     "test"]))
+    BlobPost(factory)
+    yield BuilderConfig(
+        name="cmake-clang-x64-msc16-R",
+        mergeRequests=True,
+        slavenames=["win7"],
+        env={
+            'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;'
             },
         factory=factory)
 
@@ -1170,14 +1284,14 @@ def get_builders():
                      "-v",
                      "test"]))
     BlobPost(factory)
-    yield BuilderConfig(
-        name="cmake-clang-i686-msvc10",
-        mergeRequests=True,
-        slavenames=["win7"],
-        env={
-            'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;'
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="cmake-clang-i686-msvc10",
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;'
+    #         },
+    #     factory=factory)
 
     # MSVC9
     factory = BuildFactory()
