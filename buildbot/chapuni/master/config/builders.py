@@ -118,12 +118,14 @@ def AddCMakeCentOS5(factory,
 def AddCMakeCentOS6(factory,
                     LLVM_TARGETS_TO_BUILD="all",
                     LLVM_LIT_ARGS="-v",
+                    CMAKE_C_COMPILER="/home/bb/bin/gcc",
+                    CMAKE_CXX_COMPILER="/home/bb/bin/g++",
                     **kwargs):
     AddCMake(
         factory, "Unix Makefiles",
         CMAKE_COLOR_MAKEFILE="OFF",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER=CMAKE_C_COMPILER,
+        CMAKE_CXX_COMPILER=CMAKE_CXX_COMPILER,
         CMAKE_BUILD_TYPE="Release",
         LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
@@ -478,7 +480,6 @@ def get_builders():
     AddCMakeCentOS6Ninja(
         factory, buildClang=False,
         LLVM_BUILD_EXAMPLES="ON",
-        LLVM_EXPERIMENTAL_TARGETS_TO_BUILD="R600",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
@@ -657,6 +658,8 @@ def get_builders():
                     LLVM_TARGETS_TO_BUILD="X86",
                     LLVM_ENABLE_ASSERTIONS="ON",
                     LLVM_BUILD_EXAMPLES="ON",
+                    CMAKE_C_COMPILER="/home/bb/bin/gcc47",
+                    CMAKE_CXX_COMPILER="/home/bb/bin/g++47",
                     CLANG_BUILD_EXAMPLES="ON",
                     prefix="builds/install/stage1")
     factory.addStep(Compile(name="stage1_build",
@@ -893,10 +896,14 @@ def get_builders():
             name="test_llvm",
             command=["make", "LIT_ARGS=-v -j8", "check"]))
     BlobPost(factory)
-    yield BuilderConfig(name="clang-i686-msys",
-                        mergeRequests=True,
-                        slavenames=["win7"],
-                        factory=factory)
+    yield BuilderConfig(
+        name="clang-i686-msys",
+        mergeRequests=True,
+        slavenames=["win7"],
+        env={
+            'LIT_USE_INTERNAL_SHELL': '0',
+            },
+        factory=factory)
 
     # cmake-msys
     factory = BuildFactory()
@@ -1044,7 +1051,6 @@ def get_builders():
             descriptionDone = ["built",    "llvm"]))
     factory.addStep(Compile(
             name            = 'build_llvm',
-            locks = [win7_cyg_lock.access('exclusive')],
             command         = [ninja, "check-llvm"],
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
@@ -1073,7 +1079,6 @@ def get_builders():
             descriptionDone = ["built",    "clang"]))
     factory.addStep(Compile(
             name            = 'build_clang',
-            locks = [win7_cyg_lock.access('exclusive')],
             command         = [ninja, "check-clang"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
