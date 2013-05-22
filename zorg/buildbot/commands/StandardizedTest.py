@@ -8,9 +8,9 @@ class StandardizedTest(buildbot.steps.shell.Test):
     # FIXME: We should process things in a test observer instead of at the end.
 
     knownCodes = ['FAIL', 'XFAIL', 'PASS', 'XPASS',
-                  'UNRESOLVED', 'UNSUPPORTED']
+                  'UNRESOLVED', 'UNSUPPORTED', 'IMPROVED', 'REGRESSED']
     failingCodes = set(['FAIL', 'XPASS', 'UNRESOLVED'])
-    warningCodes = set(['IGNORE PASS', 'IGNORE XFAIL'])
+    warningCodes = set(['IGNORE PASS', 'IGNORE XFAIL', 'REGRESSED'])
 
     # The list of all possible codes, including flaky and ignored codes. This is
     # the display order, as well.
@@ -32,7 +32,7 @@ class StandardizedTest(buildbot.steps.shell.Test):
 
     def parseLog(self, log_lines):
         """parseLog(log_lines) -> [(result_code, test_name, test_log), ...]"""
-        abstract
+        raise RuntimeError("Abstract method.")
 
     def evaluateCommand(self, cmd):
         results_by_code = {}
@@ -41,21 +41,20 @@ class StandardizedTest(buildbot.steps.shell.Test):
         hasIgnored = False
         for result,test,log in self.parseLog(lines):
             test = test.strip()
-            if result not in self.knownCodes:
+            if result not in self.allKnownCodes:
                 raise ValueError,'test command return invalid result code (%s)!' % result
 
             # Convert codes for flaky and ignored tests.
             if test in self.flakyTests:
                 result = 'FLAKY ' + result
-                hasIgnored = True
             elif test in self.ignoredTests:
                 result = 'IGNORE ' + result
+
+            if result.startswith('FLAKY ') or result.startswith('IGNORE '):
                 hasIgnored = True
+                
 
-            if result not in results_by_code:
-                results_by_code[result] = set()
-
-            results_by_code[result].add(test)
+            results_by_code.setdefault(result, []).append(test)
 
             # Add logs for failures.
             if result in self.failingCodes and len(logs) < self.maxLogs:
@@ -75,7 +74,8 @@ class StandardizedTest(buildbot.steps.shell.Test):
         for code in self.warningCodes:
             results = results_by_code.get(code)
             if results:
-                results_by_code[code] -= ignored_failures
+                results_by_code[code] = [x for x in results_by_code[code]
+                                         if x not in ignored_failures]
 
         # Summarize result counts.
         total = failed = passed = warnings = 0
@@ -95,7 +95,6 @@ class StandardizedTest(buildbot.steps.shell.Test):
             # Add a list of the tests in each category, for everything except
             # PASS.
             if code != 'PASS':
-                results = list(results)
                 results.sort()
                 self.addCompleteLog('tests.%s' % code,
                                     '\n'.join(results) + '\n')

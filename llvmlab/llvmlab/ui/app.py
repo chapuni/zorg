@@ -109,6 +109,10 @@ class App(flask.Flask):
         else:
             self.config.update(config)
 
+        # Set the default revision URL.
+        self.config.revlink_url = \
+            "http://llvm.org/viewvc/llvm-project?view=rev&revision=%s"
+
         # Set the application secret key.
         self.secret_key = self.config["SECRET_KEY"]
 
@@ -172,7 +176,8 @@ class App(flask.Flask):
             os.remove(backup_path)
         except:
             pass
-        shutil.move(status_path, backup_path)
+        if os.path.exists(status_path):
+            shutil.move(status_path, backup_path)
         shutil.move(data_path, status_path)
 
     def authenticate_login(self, username, password):
