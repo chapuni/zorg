@@ -343,11 +343,11 @@ def BuildStageNcyg(
     if n != 3:
         factory.addStep(LitTestCommand(
                 name="test_clang",
-                command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
+                command=["make", "TESTARGS=--use-processes -v -j8", "-C", "tools/clang/test"],
                 workdir=workdir))
         factory.addStep(LitTestCommand(
                 name="test_llvm",
-                command=["make", "LIT_ARGS=-v -j8", "check"],
+                command=["make", "LIT_ARGS=--use-processes -v -j8", "check"],
                 workdir=workdir))
 
     factory.addStep(Compile(
@@ -751,14 +751,14 @@ def get_builders():
                             command=["make", "-k"]))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
-            command         = ["make", "LIT_ARGS=-v -j8", "check"],
+            command         = ["make", "LIT_ARGS=--use-processes -v -j8", "check"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
                                     flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
-            command         = ["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
+            command         = ["make", "TESTARGS=--use-processes -v -j8", "-C", "tools/clang/test"],
             flunkOnFailure  = False,
             warnOnWarnings = False,
             flunkOnWarnings = False,
@@ -845,10 +845,10 @@ def get_builders():
     factory.addStep(LitTestCommand(
             name="test_llvm",
             command=["make", "LIT_ARGS=-v", "check"]))
-    yield BuilderConfig(name="clang-ppc-linux",
-                        mergeRequests=True,
-                        slavenames=["ps3-f12"],
-                        factory=factory)
+    # yield BuilderConfig(name="clang-ppc-linux",
+    #                     mergeRequests=True,
+    #                     slavenames=["ps3-f12"],
+    #                     factory=factory)
 
     # autoconf-msys
     factory = BuildFactory()

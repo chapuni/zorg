@@ -117,13 +117,13 @@ def get_schedulers():
             "clang-3stage-x86_64-linux",
             ])
 
-    yield AnyBranchScheduler(
-        name="notquick_autoconf",
-        change_filter = change_autoconf_llvmclang,
-        treeStableTimer=5 * 60,
-        builderNames=[
-            "clang-ppc-linux",
-            ])
+    # yield AnyBranchScheduler(
+    #     name="notquick_autoconf",
+    #     change_filter = change_autoconf_llvmclang,
+    #     treeStableTimer=5 * 60,
+    #     builderNames=[
+    #         "clang-ppc-linux",
+    #         ])
 
     yield AnyBranchScheduler(
         name="stable_autoconf",
@@ -144,7 +144,7 @@ def get_schedulers():
 #            "cmake-clang-i686-msvc10",
             "cmake-llvm-x86_64-linux",
             "clang-3stage-x86_64-linux",
-            "clang-ppc-linux",
+#            "clang-ppc-linux",
             "clang-3stage-cygwin",
             "clang-i686-msys",
             ],
