@@ -32,7 +32,7 @@ def get_status_targets(standard_builders):
 
     return [
         buildbot.status.html.WebStatus(
-            order_console_by_time=True,
+            order_console_by_time=False, # String
             change_hook_dialects={
                 'base' : True,
                 'github' : True

@@ -9,7 +9,7 @@ from buildbot.steps.shell import ShellCommand
 from buildbot.steps.shell import SetProperty
 from buildbot.steps.shell import Compile
 from buildbot.steps.shell import Test
-from buildbot.steps.slave import RemoveDirectory
+from buildbot.steps.slave import RemoveDirectory, MakeDirectory
 
 from buildbot.config import BuilderConfig
 
@@ -395,11 +395,16 @@ def Compare23(factory, warn=True):
             ))
 
 def PatchLLVMClang(factory, name):
-    factory.addStep(ShellCommand(descriptionDone="llvm-project Local Patch",
-                                 command=["sh", "-c",
-                                          "patch -p1 -N < ../" + name],
-                                 flunkOnFailure=False,
-                                 workdir="llvm-project"))
+    factory.addStep(ShellCommand(
+            descriptionDone="llvm-project Local Patch",
+            command=[
+                "patch",
+                "-p1",
+                "-N",
+                "--input=../" + name
+                ],
+            flunkOnFailure=False,
+            workdir="llvm-project"))
 
 def BlobPre(factory):
     factory.addStep(ShellCommand(
@@ -413,6 +418,18 @@ def BlobPre(factory):
             flunkOnFailure=False,
             timeout=3600,
             workdir="."))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("tmp"),
+            flunkOnFailure=False))
+    factory.addStep(MakeDirectory(
+            dir="tmp/TEMP",
+            flunkOnFailure=False))
+    factory.addStep(MakeDirectory(
+            dir="tmp/TMP",
+            flunkOnFailure=False))
+    factory.addStep(MakeDirectory(
+            dir="tmp/TMPDIR",
+            flunkOnFailure=False))
 
 def BlobPost(factory):
     factory.addStep(SetProperty(
@@ -506,12 +523,19 @@ def get_builders():
 
     BlobPost(factory)
 
-    yield BuilderConfig(name="cmake-llvm-x86_64-linux",
-                        slavenames=["centos6"],
-                        mergeRequests=False,
-                        locks=[centos6_lock.access('counting')],
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
-                        factory=factory)
+    yield BuilderConfig(
+        name="cmake-llvm-x86_64-linux",
+        slavenames=["centos6"],
+        mergeRequests=False,
+        locks=[centos6_lock.access('counting')],
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
 
     # CentOS5(clang only)
     factory = BuildFactory()
@@ -580,11 +604,18 @@ def get_builders():
             descriptionDone = ["built",    "all"]))
 
     BlobPost(factory)
-    yield BuilderConfig(name="cmake-clang-x86_64-linux",
-                        slavenames=["centos6"],
-                        mergeRequests=False,
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
-                        factory=factory)
+    yield BuilderConfig(
+        name="cmake-clang-x86_64-linux",
+        slavenames=["centos6"],
+        mergeRequests=False,
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
 
     # CentOS5(3stage)
     factory = BuildFactory()
@@ -701,19 +732,26 @@ def get_builders():
     Compare23(
         factory,
         )
-    yield BuilderConfig(name="clang-3stage-x86_64-linux",
-                        slavenames=["centos6"],
-                        mergeRequests=True,
-                        env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
-                        factory=factory)
+    yield BuilderConfig(
+        name="clang-3stage-x86_64-linux",
+        slavenames=["centos6"],
+        mergeRequests=True,
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
 
     # Cygwin(3stage)
     factory = BuildFactory()
     AddGitLLVMTree(factory,
                     'git://192.168.1.199/var/cache/llvm-project-tree.git',
                     '/cygdrive/d/llvm-project.git')
-    PatchLLVMClang(factory, "llvmclang.diff")
     BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/llvm-project/clang/test/Index"),
@@ -786,10 +824,17 @@ def get_builders():
         factory,
         warn=False,
         )
-    yield BuilderConfig(name="clang-3stage-cygwin",
-                        slavenames=["cygwin"],
-                        mergeRequests=True,
-                        factory=factory)
+    yield BuilderConfig(
+        name="clang-3stage-cygwin",
+        slavenames=["cygwin"],
+        mergeRequests=True,
+        env={
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
 
     # PS3
     factory = BuildFactory()
@@ -853,13 +898,13 @@ def get_builders():
     # autoconf-msys
     factory = BuildFactory()
     AddGitWin7(factory)
+    BlobPre(factory)
     PatchLLVMClang(factory, "llvmclang.diff")
     factory.addStep(SetProperty(name="get_msys_path",
                                 command=["sh", "-c", "PWD= sh pwd"],
                                 workdir=".",
                                 property="workdir_msys"))
 
-    BlobPre(factory)
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf", "install",
@@ -891,10 +936,10 @@ def get_builders():
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
-            command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"]))
+            command=["make", "TESTARGS=-v -j8 --use-processes", "-C", "tools/clang/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
-            command=["make", "LIT_ARGS=-v -j8", "check"]))
+            command=["make", "LIT_ARGS=-v -j8 --use-processes", "check"]))
     BlobPost(factory)
     yield BuilderConfig(
         name="clang-i686-msys",
@@ -902,6 +947,9 @@ def get_builders():
         slavenames=["win7"],
         env={
             'LIT_USE_INTERNAL_SHELL': '0',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
             },
         factory=factory)
 
@@ -940,8 +988,8 @@ def get_builders():
     ninja = "E:/bb-win7/ninja.exe"
     factory = BuildFactory()
     AddGitWin7(factory)
-    PatchLLVMClang(factory, "llvmclang.diff")
     BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     AddCMakeDOS(
         factory, "Ninja",
@@ -1018,17 +1066,23 @@ def get_builders():
             ))
 
     BlobPost(factory)
-    yield BuilderConfig(name="cmake-clang-i686-mingw32",
-                        mergeRequests=True,
-                        slavenames=["win7"],
-                        factory=factory)
+    yield BuilderConfig(
+        name="cmake-clang-i686-mingw32",
+        mergeRequests=True,
+        slavenames=["win7"],
+        env={
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
 
     # ninja-msc17
     ninja = "E:/bb-win7/ninja.exe"
     factory = BuildFactory()
     AddGitWin7(factory)
-    PatchLLVMClang(factory, "llvmclang.diff")
     BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     AddCMakeDOS(
         factory, "Ninja",
@@ -1047,6 +1101,8 @@ def get_builders():
             name            = 'build_llvm',
             locks = [win7_cyg_lock.access('exclusive')],
             command         = [ninja, "check-llvm"],
+            haltOnFailure = False,
+            flunkOnFailure=False,
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
     factory.addStep(Compile(
@@ -1079,6 +1135,8 @@ def get_builders():
             descriptionDone = ["built",    "clang"]))
     factory.addStep(Compile(
             name            = 'build_clang',
+            haltOnFailure = False,
+            flunkOnFailure=False,
             command         = [ninja, "check-clang"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
@@ -1098,6 +1156,8 @@ def get_builders():
             name            = 'build_clang_tools',
             #locks = [win7_cyg_lock.access('exclusive')],
             command         = [ninja, "check-clang-tools"],
+            haltOnFailure = False,
+            flunkOnFailure=False,
             description     = ["building", "tools"],
             descriptionDone = ["built",    "tools"]))
     factory.addStep(Compile(
@@ -1135,6 +1195,9 @@ def get_builders():
             'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
             'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
             'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};E:\bb-win7',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
             },
         factory=factory)
 
@@ -1214,7 +1277,10 @@ def get_builders():
         mergeRequests=True,
         slavenames=["win7"],
         env={
-            'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;'
+            'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
             },
         factory=factory)
 
