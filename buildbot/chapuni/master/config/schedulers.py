@@ -72,66 +72,87 @@ change_clang_master = ChangeFilter(filter_fn = filter_cmake_clang,
 # case, just kick off a 'runtests' build
 
 def get_schedulers():
-    yield AnyBranchScheduler(
-        name="quick-clang",
-        change_filter = change_clang_master,
-        treeStableTimer=None,
-        builderNames=[
-            "cmake-clang-x86_64-linux",
-            ])
-    yield AnyBranchScheduler(
-        name="notquick1",
-        change_filter = change_cmake_llvmclang,
-        treeStableTimer=90,
-        builderNames=[
-            "ninja-clang-i686-msc17-R",
-            ])
-    yield AnyBranchScheduler(
-        name="notquick5",
-        change_filter = change_cmake_llvmclang,
-        treeStableTimer=5 * 60,
-        builderNames=[
-            "cmake-clang-i686-mingw32",
-            ])
-    yield AnyBranchScheduler(
-        name="notquick20",
-        change_filter = change_cmake_llvmclang,
-        treeStableTimer=20 * 60,
-        builderNames=[
-            "cmake-clang-x64-msc16-R",
-#            "cmake-clang-i686-msvc10",
-#            "cmake-clang-i686-msvc9",
-            ])
-    yield AnyBranchScheduler(
+    llvm_linux = AnyBranchScheduler(
         name="quick-llvm",
         change_filter = change_llvm_master,
         treeStableTimer=None,
         builderNames=[
             "cmake-llvm-x86_64-linux",
             ])
-    yield AnyBranchScheduler(
+    yield llvm_linux
+    clang_linux = AnyBranchScheduler(
+        name="quick-clang",
+        change_filter = change_clang_master,
+        treeStableTimer=None,
+        upstreams=[llvm_linux],
+        builderNames=[
+            "cmake-clang-x86_64-linux",
+            ])
+    yield clang_linux
+    llvmclang_mingw32 = AnyBranchScheduler(
+        name="notquick5",
+        change_filter = change_cmake_llvmclang,
+        #treeStableTimer=5 * 60,
+        treeStableTimer=None,
+        upstreams=[llvm_linux, clang_linux],
+        builderNames=[
+            "cmake-clang-i686-mingw32",
+            ])
+    yield llvmclang_mingw32
+    llvmclang_msc17 = AnyBranchScheduler(
+        name="notquick1",
+        change_filter = change_cmake_llvmclang,
+        #treeStableTimer=90,
+        treeStableTimer=None,
+        upstreams=[llvmclang_mingw32],
+        builderNames=[
+            "ninja-clang-i686-msc17-R",
+            ])
+    yield llvmclang_msc17
+    llvmclang_msc16_x64 = AnyBranchScheduler(
+        name="notquick20",
+        change_filter = change_cmake_llvmclang,
+        #treeStableTimer=20 * 60,
+        treeStableTimer=None,
+        upstreams=[llvmclang_msc17],
+        builderNames=[
+            "cmake-clang-x64-msc16-R",
+            ])
+    yield llvmclang_msc16_x64
+    clang_3stage_linux = AnyBranchScheduler(
         name="stable",
         change_filter = change_llvmclang,
-        treeStableTimer=30 * 60,
+        #treeStableTimer=30 * 60,
+        treeStableTimer=None,
+        upstreams=[llvm_linux, clang_linux],
         builderNames=[
             "clang-3stage-x86_64-linux",
             ])
-
-    # yield AnyBranchScheduler(
-    #     name="notquick_autoconf",
-    #     change_filter = change_autoconf_llvmclang,
-    #     treeStableTimer=5 * 60,
-    #     builderNames=[
-    #         "clang-ppc-linux",
-    #         ])
+    yield clang_3stage_linux
 
     yield AnyBranchScheduler(
-        name="stable_autoconf",
+        name="s_msys",
         change_filter = change_autoconf_llvmclang,
-        treeStableTimer=60 * 60,
+        #treeStableTimer=60 * 60,
+        treeStableTimer=None,
+        upstreams=[
+            llvmclang_mingw32,
+            ],
+        builderNames=[
+            "clang-i686-msys",
+            ])
+
+    yield AnyBranchScheduler(
+        name="s_3stage_cygwin",
+        change_filter = change_autoconf_llvmclang,
+        #treeStableTimer=60 * 60,
+        treeStableTimer=None,
+        upstreams=[
+            llvmclang_mingw32,
+            clang_3stage_linux,
+            ],
         builderNames=[
             "clang-3stage-cygwin",
-            "clang-i686-msys",
             ])
 
     yield ForceScheduler(
