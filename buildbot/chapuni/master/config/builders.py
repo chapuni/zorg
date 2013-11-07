@@ -936,9 +936,11 @@ def get_builders():
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
+            locks = [win7_cyg_lock.access('exclusive')],
             command=["make", "TESTARGS=-v -j8 --use-processes", "-C", "tools/clang/test"]))
     factory.addStep(LitTestCommand(
             name="test_llvm",
+            locks = [win7_cyg_lock.access('exclusive')],
             command=["make", "LIT_ARGS=-v -j8 --use-processes", "check"]))
     BlobPost(factory)
     yield BuilderConfig(
