@@ -745,6 +745,78 @@ def get_builders():
             },
         factory=factory)
 
+    # Cygwin on CentOS6
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+
+    BlobPre(factory)
+
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory)
+    factory.addStep(ShellCommand(
+            command=[
+                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                "CC=/home/bb/bin/gcc47",
+                "CXX=/home/bb/bin/g++47",
+                WithProperties("--prefix=%(workdir)s/install"),
+                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "--target=i686-pc-cygwin",
+                "--enable-optimized",
+                "--with-optimize-option=-O2",
+                ],
+            name="configure",
+            description="configuring",
+            descriptionDone="Configure",
+            doStepIf=Makefile_not_ready,
+            ))
+    factory.addStep(ShellCommand(command=["sh", "-c",
+                                          "./config.status --recheck"],
+                                 doStepIf=sample_needed_update,
+                                 workdir="build/projects/sample"))
+    factory.addStep(ShellCommand(command=["sh", "-c",
+                                          "./config.status"],
+                                 doStepIf=sample_needed_update,
+                                 workdir="build/projects/sample"))
+    factory.addStep(Compile(
+            name="build",
+            locks=[centos6_lock.access('counting')],
+            command=[
+                "make",
+                "-k",
+                "-j8",
+                ],
+            ))
+    factory.addStep(LitTestCommand(
+            name="test_llvmclang",
+            locks=[centos6_lock.access('counting')],
+            command=["make", "LIT_ARGS=-v -j8", "check-all"],
+            timeout=60,
+            ))
+    factory.addStep(Compile(
+            name="install",
+            command=[
+                "make",
+                "VERBOSE=1",
+                "install",
+                "-j8"],
+            ))
+
+    BlobPost(factory)
+
+    yield BuilderConfig(
+        name="clang-i686-cygwin-RA-centos6",
+        slavenames=["centos6"],
+        mergeRequests=True,
+        env={
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
     # Cygwin(3stage)
     factory = BuildFactory()
     AddGitLLVMTree(factory,
