@@ -12,7 +12,7 @@ def Tllvm(l): return filter_t(l, r'^llvm/')
 def Tclang(l): return filter_t(l, r'^clang/')
 def Tclang_extra(l): return filter_t(l, r'^clang-tools-extra/')
 def Tcmake(l):
-    return filter_t(l, r'^llvm/cmake/') + filter_t(l, r'/CMakeLists\.txt$') + filter_t(l, r'/LLVMBuild\.txt$') + filter_t(l, r'^llvm/utils/llvm-build/')
+    return filter_t(l, r'^llvm/cmake/') + filter_t(l, r'/CMakeLists\.txt$')
 def Tllvmlib(l):
     return filter_t(l, r'^llvm/(include|lib|tools|utils)/')
 def Fllvmtest(l): return filter_f(l, r'^llvm/test/.+/')
@@ -84,7 +84,8 @@ def get_schedulers():
     clang_linux = AnyBranchScheduler(
         name="quick-clang",
         change_filter = change_clang_master,
-        treeStableTimer=None,
+        #treeStableTimer=None,
+        treeStableTimer=30,
         upstreams=[llvm_linux],
         builderNames=[
             "cmake-clang-x86_64-linux",
@@ -94,8 +95,7 @@ def get_schedulers():
     cyg_centos6 = AnyBranchScheduler(
         name="s_cyg_centos6",
         change_filter = change_autoconf_llvmclang,
-        #treeStableTimer=60 * 60,
-        treeStableTimer=None,
+        treeStableTimer=1 * 60,
         upstreams=[llvm_linux, clang_linux],
         builderNames=[
             "clang-i686-cygwin-RA-centos6",
@@ -105,9 +105,8 @@ def get_schedulers():
     llvmclang_mingw32 = AnyBranchScheduler(
         name="notquick5",
         change_filter = change_cmake_llvmclang,
-        #treeStableTimer=5 * 60,
-        treeStableTimer=None,
-        upstreams=[cyg_centos6],
+        treeStableTimer=5 * 60,
+        upstreams=[cyg_centos6, llvm_linux, clang_linux],
         builderNames=[
             "cmake-clang-i686-mingw32",
             ])
@@ -116,8 +115,7 @@ def get_schedulers():
     llvmclang_msc17 = AnyBranchScheduler(
         name="notquick1",
         change_filter = change_cmake_llvmclang,
-        #treeStableTimer=90,
-        treeStableTimer=None,
+        treeStableTimer=2 * 60,
         upstreams=[llvmclang_mingw32],
         builderNames=[
             "ninja-clang-i686-msc17-R",
@@ -127,8 +125,7 @@ def get_schedulers():
     llvmclang_msc16_x64 = AnyBranchScheduler(
         name="notquick20",
         change_filter = change_cmake_llvmclang,
-        #treeStableTimer=20 * 60,
-        treeStableTimer=None,
+        treeStableTimer=20 * 60,
         upstreams=[llvmclang_msc17],
         builderNames=[
             "cmake-clang-x64-msc16-R",
@@ -138,8 +135,7 @@ def get_schedulers():
     clang_3stage_linux = AnyBranchScheduler(
         name="stable",
         change_filter = change_llvmclang,
-        #treeStableTimer=30 * 60,
-        treeStableTimer=None,
+        treeStableTimer=4 * 60,
         upstreams=[llvm_linux, clang_linux],
         builderNames=[
             "clang-3stage-x86_64-linux",
@@ -149,10 +145,9 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="s_msys",
         change_filter = change_autoconf_llvmclang,
-        #treeStableTimer=60 * 60,
-        treeStableTimer=None,
+        treeStableTimer=60 * 60,
         upstreams=[
-            llvmclang_mingw32,
+            cyg_centos6, llvmclang_mingw32,
             ],
         builderNames=[
             "clang-i686-msys",
@@ -161,9 +156,9 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="s_3stage_cygwin",
         change_filter = change_autoconf_llvmclang,
-        #treeStableTimer=60 * 60,
-        treeStableTimer=None,
+        treeStableTimer=60 * 60,
         upstreams=[
+            cyg_centos6,
             llvmclang_mingw32,
             clang_3stage_linux,
             ],
@@ -183,6 +178,7 @@ def get_schedulers():
             "clang-3stage-x86_64-linux",
 #            "clang-ppc-linux",
             "clang-3stage-cygwin",
+            "clang-i686-cygwin-RA-centos6",
             "clang-i686-msys",
             ],
 

@@ -3,10 +3,11 @@
 # only take place on one slave.
 
 from buildbot.process.factory import BuildFactory
+from buildbot.steps.master import SetProperty
 from buildbot.steps.source import Git
 from buildbot.steps.shell import WithProperties
 from buildbot.steps.shell import ShellCommand
-from buildbot.steps.shell import SetProperty
+from buildbot.steps.shell import SetPropertyFromCommand
 from buildbot.steps.shell import Compile
 from buildbot.steps.shell import Test
 from buildbot.steps.slave import RemoveDirectory, MakeDirectory
@@ -20,6 +21,12 @@ def clang_not_ready(step):
 
 def Makefile_not_ready(step):
     return step.build.getProperty("exists_Makefile") != "OK"
+
+def Revision_known(step):
+    return not step.build.getProperty("revision_hash") in ("", None)
+
+def Revision_unknown(step):
+    return step.build.getProperty("revision_hash") in ("", None)
 
 def sample_needed_update(step):
     return False and step.build.getProperty("branch") == "release_32"
@@ -35,14 +42,44 @@ win7_git_lock = locks.SlaveLock("win7_git_lock")
 win7_cyg_lock = locks.MasterLock("win7_cyg_lock")
 
 def CheckMakefile(factory, makefile="Makefile"):
-    factory.addStep(SetProperty(name="Makefile_isready",
-                                command=["sh", "-c",
-                                         "test -e " + makefile + "&& echo OK"],
-                                flunkOnFailure=False,
-                                property="exists_Makefile"))
+    factory.addStep(SetPropertyFromCommand(
+            name="Makefile_isready",
+            command=[
+                "sh", "-c",
+                "test -e " + makefile + "&& echo OK",
+                ],
+            flunkOnFailure=False,
+            property="exists_Makefile"))
 
 # Factories
 def AddGitLLVMTree(factory, repo, ref):
+    factory.addStep(SetProperty(
+            property="revision_hash",
+            doStepIf=Revision_unknown,
+            value=''))
+    factory.addStep(SetPropertyFromCommand(
+            name="git-hash-1",
+            command=[
+                "git",
+                "--git-dir", ref,
+                "rev-list",
+                "--no-walk",
+                "--abbrev-commit",
+                WithProperties("refs/tags/t/%(revision)s"),
+                ],
+            property="revision_hash",
+            doStepIf=Revision_unknown,
+            flunkOnFailure=False))
+    factory.addStep(ShellCommand(
+            name="git-tag-hash",
+            command=[
+                "git", "tag", "-f",
+                WithProperties("%(revision)s"),
+                WithProperties("%(revision_hash)s"),
+                ],
+            doStepIf=Revision_known,
+            workdir='llvm-project',
+            flunkOnFailure=False));
     if ref is None:
         factory.addStep(Git(repourl=repo,
                             timeout=3600,
@@ -52,16 +89,29 @@ def AddGitLLVMTree(factory, repo, ref):
                             reference=ref,
                             timeout=3600,
                             workdir='llvm-project'))
-    factory.addStep(SetProperty(name="got_revision",
-                                command=["git", "describe", "--tags"],
-                                workdir="llvm-project",
-                                property="got_revision"))
+    factory.addStep(SetPropertyFromCommand(
+            name="got_revision",
+            command=["git", "describe", "--tags"],
+            workdir="llvm-project",
+            property="got_revision"))
     factory.addStep(ShellCommand(command=["git",
                                           "clean",
                                           "-fx"],
                                  workdir="llvm-project"))
 
 def AddGitFetch(factory, ref, locks=[]):
+    factory.addStep(SetPropertyFromCommand(
+            name="git-hash-0",
+            command=[
+                "git",
+                "--git-dir", ref,
+                "rev-list",
+                "--no-walk",
+                "--abbrev-commit",
+                WithProperties("refs/tags/t/%(revision)s"),
+                ],
+            property="revision_hash",
+            flunkOnFailure=False))
     factory.addStep(ShellCommand(
             name="git-fetch",
             command=[
@@ -70,6 +120,7 @@ def AddGitFetch(factory, ref, locks=[]):
                 "fetch",
                 "--prune"],
             locks=locks,
+            doStepIf=Revision_unknown,
             flunkOnFailure=False));
 
 def AddGitWin7(factory):
@@ -432,7 +483,7 @@ def BlobPre(factory):
             flunkOnFailure=False))
 
 def BlobPost(factory):
-    factory.addStep(SetProperty(
+    factory.addStep(SetPropertyFromCommand(
             name="build_successful_init",
             command=[
                 "sh", "-c",
@@ -440,7 +491,7 @@ def BlobPost(factory):
             alwaysRun=True,
             flunkOnFailure=False,
             property="build_successful"))
-    factory.addStep(SetProperty(
+    factory.addStep(SetPropertyFromCommand(
             name="build_successful",
             command=[
                 "sh", "-c",
@@ -525,6 +576,7 @@ def get_builders():
 
     yield BuilderConfig(
         name="cmake-llvm-x86_64-linux",
+        category="Linux",
         slavenames=["centos6"],
         mergeRequests=False,
         locks=[centos6_lock.access('counting')],
@@ -606,6 +658,7 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-x86_64-linux",
+        category="Linux",
         slavenames=["centos6"],
         mergeRequests=False,
         env={
@@ -734,6 +787,7 @@ def get_builders():
         )
     yield BuilderConfig(
         name="clang-3stage-x86_64-linux",
+        category="Linux",
         slavenames=["centos6"],
         mergeRequests=True,
         env={
@@ -807,6 +861,7 @@ def get_builders():
 
     yield BuilderConfig(
         name="clang-i686-cygwin-RA-centos6",
+        category="Linux",
         slavenames=["centos6"],
         mergeRequests=True,
         env={
@@ -898,6 +953,7 @@ def get_builders():
         )
     yield BuilderConfig(
         name="clang-3stage-cygwin",
+        category="Cygwin",
         slavenames=["cygwin"],
         mergeRequests=True,
         env={
@@ -972,10 +1028,11 @@ def get_builders():
     AddGitWin7(factory)
     BlobPre(factory)
     PatchLLVMClang(factory, "llvmclang.diff")
-    factory.addStep(SetProperty(name="get_msys_path",
-                                command=["sh", "-c", "PWD= sh pwd"],
-                                workdir=".",
-                                property="workdir_msys"))
+    factory.addStep(SetPropertyFromCommand(
+            name="get_msys_path",
+            command=["sh", "-c", "PWD= sh pwd"],
+            workdir=".",
+            property="workdir_msys"))
 
     factory.addStep(ShellCommand(
             command=[
@@ -1017,6 +1074,7 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="clang-i686-msys",
+        category="Windows",
         mergeRequests=True,
         slavenames=["win7"],
         env={
@@ -1142,6 +1200,7 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-i686-mingw32",
+        category="Windows",
         mergeRequests=True,
         slavenames=["win7"],
         env={
@@ -1263,6 +1322,7 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="ninja-clang-i686-msc17-R",
+        category="Windows",
         mergeRequests=True,
         slavenames=["win7"],
         env={
@@ -1304,13 +1364,13 @@ def get_builders():
                             timeout=3600,
                             locks = [win7_cyg_lock.access('exclusive')],
                             command=[msbuild,
-                                     "-m",
+                                     "-m:4",
                                      "-v:m",
                                      "-p:Configuration=Release",
                                      "ALL_BUILD.vcxproj"]))
     factory.addStep(Compile(name="install",
                             command=[msbuild,
-                                     "-m",
+                                     "-m:4",
                                      "-v:m",
                                      "-p:Configuration=Release",
                                      "INSTALL.vcxproj"]))
@@ -1348,6 +1408,7 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-x64-msc16-R",
+        category="Windows",
         mergeRequests=True,
         slavenames=["win7"],
         env={
