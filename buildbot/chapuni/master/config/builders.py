@@ -395,10 +395,12 @@ def BuildStageNcyg(
         factory.addStep(LitTestCommand(
                 name="test_clang",
                 command=["make", "TESTARGS=--use-processes -v -j8", "-C", "tools/clang/test"],
+                locks = [win7_cyg_lock.access('exclusive')],
                 workdir=workdir))
         factory.addStep(LitTestCommand(
                 name="test_llvm",
                 command=["make", "LIT_ARGS=--use-processes -v -j8", "check"],
+                locks = [win7_cyg_lock.access('exclusive')],
                 workdir=workdir))
 
     factory.addStep(Compile(
@@ -917,6 +919,10 @@ def get_builders():
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
             command         = ["make", "LIT_ARGS=--use-processes -v -j8", "check"],
+            locks = [win7_cyg_lock.access('exclusive')],
+            flunkOnFailure  = False,
+            warnOnWarnings = False,
+            flunkOnWarnings = False,
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
@@ -924,6 +930,7 @@ def get_builders():
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "TESTARGS=--use-processes -v -j8", "-C", "tools/clang/test"],
+            locks = [win7_cyg_lock.access('exclusive')],
             flunkOnFailure  = False,
             warnOnWarnings = False,
             flunkOnWarnings = False,

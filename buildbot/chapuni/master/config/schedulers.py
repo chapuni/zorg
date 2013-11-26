@@ -34,7 +34,8 @@ def filter_cmake_llvm(change):
     return len(Fhtml(l)) > 0
 
 change_llvm_master = ChangeFilter(filter_fn = filter_cmake_llvm,
-                                  branch=['master'])
+                                  #branch=['master'],
+                                  )
 
 def filter_llvmclang(change):
     l = Fhtml(getattr(change, "files"))
@@ -66,7 +67,8 @@ def filter_cmake_clang(change):
     return len(Fllvmtest(Fhtml(l))) > 0
 
 change_clang_master = ChangeFilter(filter_fn = filter_cmake_clang,
-                                       branch=['master'])
+                                   #branch=['master'],
+                                   )
 
 # Configure the Schedulers, which decide how to react to incoming changes.  In this
 # case, just kick off a 'runtests' build
@@ -85,8 +87,9 @@ def get_schedulers():
         name="quick-clang",
         change_filter = change_clang_master,
         #treeStableTimer=None,
-        treeStableTimer=30,
+        treeStableTimer=2,
         upstreams=[llvm_linux],
+        waitAllUpstreams=False,
         builderNames=[
             "cmake-clang-x86_64-linux",
             ])
@@ -95,7 +98,7 @@ def get_schedulers():
     cyg_centos6 = AnyBranchScheduler(
         name="s_cyg_centos6",
         change_filter = change_autoconf_llvmclang,
-        treeStableTimer=1 * 60,
+        treeStableTimer=5,
         upstreams=[llvm_linux, clang_linux],
         builderNames=[
             "clang-i686-cygwin-RA-centos6",
@@ -105,7 +108,7 @@ def get_schedulers():
     llvmclang_mingw32 = AnyBranchScheduler(
         name="notquick5",
         change_filter = change_cmake_llvmclang,
-        treeStableTimer=5 * 60,
+        treeStableTimer=1 * 60,
         upstreams=[cyg_centos6, llvm_linux, clang_linux],
         builderNames=[
             "cmake-clang-i686-mingw32",
@@ -125,7 +128,7 @@ def get_schedulers():
     llvmclang_msc16_x64 = AnyBranchScheduler(
         name="notquick20",
         change_filter = change_cmake_llvmclang,
-        treeStableTimer=20 * 60,
+        treeStableTimer=15 * 60,
         upstreams=[llvmclang_msc17],
         builderNames=[
             "cmake-clang-x64-msc16-R",
@@ -135,7 +138,7 @@ def get_schedulers():
     clang_3stage_linux = AnyBranchScheduler(
         name="stable",
         change_filter = change_llvmclang,
-        treeStableTimer=4 * 60,
+        treeStableTimer=15 * 60,
         upstreams=[llvm_linux, clang_linux],
         builderNames=[
             "clang-3stage-x86_64-linux",
