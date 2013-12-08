@@ -11,6 +11,7 @@ from buildbot.steps.shell import SetPropertyFromCommand
 from buildbot.steps.shell import Compile
 from buildbot.steps.shell import Test
 from buildbot.steps.slave import RemoveDirectory, MakeDirectory
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED
 
 from buildbot.config import BuilderConfig
 
@@ -56,6 +57,7 @@ def AddGitLLVMTree(factory, repo, ref):
     factory.addStep(SetProperty(
             property="revision_hash",
             doStepIf=Revision_unknown,
+            hideStepIf=lambda results, s: results==SKIPPED,
             value=''))
     factory.addStep(SetPropertyFromCommand(
             name="git-hash-1",
@@ -69,6 +71,7 @@ def AddGitLLVMTree(factory, repo, ref):
                 ],
             property="revision_hash",
             doStepIf=Revision_unknown,
+            hideStepIf=lambda results, s: results==SKIPPED,
             flunkOnFailure=False))
     factory.addStep(ShellCommand(
             name="git-tag-hash",
@@ -78,6 +81,7 @@ def AddGitLLVMTree(factory, repo, ref):
                 WithProperties("%(revision_hash)s"),
                 ],
             doStepIf=Revision_known,
+            hideStepIf=lambda results, s: results==SKIPPED,
             workdir='llvm-project',
             flunkOnFailure=False));
     if ref is None:
@@ -111,6 +115,7 @@ def AddGitFetch(factory, ref, locks=[]):
                 WithProperties("refs/tags/t/%(revision)s"),
                 ],
             property="revision_hash",
+            hideStepIf=lambda results, s: results==FAILURE,
             flunkOnFailure=False))
     factory.addStep(ShellCommand(
             name="git-fetch",
@@ -121,6 +126,7 @@ def AddGitFetch(factory, ref, locks=[]):
                 "--prune"],
             locks=locks,
             doStepIf=Revision_unknown,
+            hideStepIf=lambda results, s: results==SKIPPED,
             flunkOnFailure=False));
 
 def AddGitWin7(factory):
@@ -203,6 +209,23 @@ def AddCMakeDOS(factory, G,
              LLVM_LIT_ARGS=LLVM_LIT_ARGS,
              LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
              **kwargs)
+
+def AddLitDOS(factory, name, dir, lock=True, build_mode='.'):
+    locks = []
+    if lock:
+        locks = [win7_cyg_lock.access('exclusive')]
+    factory.addStep(LitTestCommand(
+            name            = 'test-' + name,
+            locks = locks,
+            command         = [
+                "c:/Python27/python.exe",
+                "../llvm-project/llvm/utils/lit/lit.py",
+                "-v",
+                "--param", "build_mode="+build_mode,
+                dir,
+                ],
+            description     = ["testing", name],
+            descriptionDone = ["test",    name]))
 
 def BuildStageN(factory, n,
                 root="builds"):
@@ -555,6 +578,7 @@ def get_builders():
     factory.addStep(Compile(
             name            = 'build_llvm',
             command         = ["ninja", "check-all"],
+            locks           = [centos6_lock.access('counting')],
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
     factory.addStep(LitTestCommand(
@@ -564,6 +588,7 @@ def get_builders():
                 "-v",
                 "test",
                 ],
+            locks           = [centos6_lock.access('counting')],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"],
             timeout=60,
@@ -581,7 +606,7 @@ def get_builders():
         category="Linux",
         slavenames=["centos6"],
         mergeRequests=False,
-        locks=[centos6_lock.access('counting')],
+        #locks=[centos6_lock.access('counting')],
         env={
             'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
@@ -627,7 +652,6 @@ def get_builders():
         LLVM_BUILD_RUNTIME="OFF",
         LLVM_BUILD_TESTS="OFF",
         LLVM_BUILD_TOOLS="OFF",
-        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         CLANG_BUILD_EXAMPLES="ON",
         doStepIf=Makefile_not_ready)
@@ -639,12 +663,11 @@ def get_builders():
             descriptionDone = ["built",    "clang"]))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
-            #locks           = [centos6_lock.access('counting')],
+            locks           = [centos6_lock.access('counting')],
             command         = [
                 "bin/llvm-lit",
                 "-v",
                 "tools/clang/test",
-                "tools/clang/tools/extra/test",
                 ],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"],
@@ -660,6 +683,64 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-x86_64-linux",
+        category="Linux",
+        slavenames=["centos6"],
+        mergeRequests=False,
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
+    # CentOS6(tools only)
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+    BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeCentOS6Ninja(
+        factory,
+        LLVM_BUILD_EXAMPLES="OFF",
+        LLVM_BUILD_RUNTIME="OFF",
+        LLVM_BUILD_TESTS="OFF",
+        LLVM_BUILD_TOOLS="OFF",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        CLANG_BUILD_EXAMPLES="ON",
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name            = 'build_clang',
+            locks           = [centos6_lock.access('counting')],
+            command         = ["ninja", "check-clang-tools"],
+            description     = ["building", "clang-tools"],
+            descriptionDone = ["built",    "clang-tools"]))
+    factory.addStep(LitTestCommand(
+            name            = 'test_clang',
+            #locks           = [centos6_lock.access('counting')],
+            command         = [
+                "bin/llvm-lit",
+                "-v",
+                "tools/clang/tools/extra/test",
+                ],
+            description     = ["testing", "clang"],
+            descriptionDone = ["test",    "clang"],
+            timeout=60,
+            ))
+    # factory.addStep(Compile(
+    #         #locks           = [centos6_lock.access('counting')],
+    #         name            = 'build_all',
+    #         command         = ["ninja"],
+    #         description     = ["building", "all"],
+    #         descriptionDone = ["built",    "all"]))
+
+    BlobPost(factory)
+    yield BuilderConfig(
+        name="cmake-clang-tools-x86_64-linux",
         category="Linux",
         slavenames=["centos6"],
         mergeRequests=False,
@@ -820,6 +901,7 @@ def get_builders():
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "--target=i686-pc-cygwin",
                 "--enable-optimized",
+                "--enable-targets=x86",
                 "--with-optimize-option=-O2",
                 ],
             name="configure",
@@ -956,10 +1038,10 @@ def get_builders():
     #                              workdir="."))
     Compare23(
         factory,
-        warn=False,
+        #warn=False,
         )
     yield BuilderConfig(
-        name="clang-3stage-cygwin",
+        name="clang-3stage-i686-cygwin",
         category="Cygwin",
         slavenames=["cygwin"],
         mergeRequests=True,
@@ -1124,7 +1206,7 @@ def get_builders():
 
     # cmake-mingw32-ninja
     #ninja = "D:/archives/ninja.exe"
-    ninja = "E:/bb-win7/ninja.exe"
+    ninja = "C:/bb-win7/ninja.exe"
     factory = BuildFactory()
     AddGitWin7(factory)
     BlobPre(factory)
@@ -1142,62 +1224,22 @@ def get_builders():
         doStepIf=Makefile_not_ready)
 
     factory.addStep(Compile(
-            name            = 'build_llvm',
+            name            = 'build',
             locks = [win7_cyg_lock.access('exclusive')],
-            command         = [ninja, "check-llvm"],
-            description     = ["building", "llvm"],
-            descriptionDone = ["built",    "llvm"]))
-    factory.addStep(LitTestCommand(
-            name            = 'test_llvm',
-            locks = [win7_cyg_lock.access('exclusive')],
-            command         = [
-                "c:/Python27/python.exe",
-                "bin/llvm-lit",
-                "-v",
-                "test",
-                ],
-            description     = ["testing", "llvm"],
-            descriptionDone = ["test",    "llvm"]))
+            command         = [ninja, "check-all"],
+            description     = ["building", "llvmclang"],
+            descriptionDone = ["built",    "llvmclang"]))
 
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
                 WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
-    factory.addStep(Compile(
-            name            = 'build_clang',
-            locks = [win7_cyg_lock.access('exclusive')],
-            command         = [ninja, "check-clang"],
-            description     = ["building", "clang"],
-            descriptionDone = ["built",    "clang"]))
-    factory.addStep(LitTestCommand(
-            name            = 'test_clang',
-            locks = [win7_cyg_lock.access('exclusive')],
-            command         = [
-                "c:/Python27/python.exe",
-                "bin/llvm-lit",
-                "-v",
-                "tools/clang/test",
-                ],
-            description     = ["testing", "clang"],
-            descriptionDone = ["test",    "clang"]))
+    AddLitDOS(factory, "clang", "tools/clang/test")
 
-    factory.addStep(Compile(
-            name            = 'build_clang_tools',
-            #locks = [win7_cyg_lock.access('exclusive')],
-            command         = [ninja, "check-clang-tools"],
-            description     = ["building", "tools"],
-            descriptionDone = ["built",    "tools"]))
-    factory.addStep(LitTestCommand(
-            name            = 'test_clang_tools',
-            command         = [
-                "c:/Python27/python.exe",
-                "bin/llvm-lit",
-                "-v",
-                "tools/clang/tools/extra/test",
-                ],
-            description     = ["testing", "tools"],
-            descriptionDone = ["test",    "tools"]))
+    AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
+
+    AddLitDOS(factory, "llvm", "test")
 
     factory.addStep(Compile(
             command=[ninja, "install"],
@@ -1218,7 +1260,7 @@ def get_builders():
         factory=factory)
 
     # ninja-msc17
-    ninja = "E:/bb-win7/ninja.exe"
+    ninja = "C:/bb-win7/ninja.exe"
     factory = BuildFactory()
     AddGitWin7(factory)
     BlobPre(factory)
@@ -1250,17 +1292,7 @@ def get_builders():
             command         = [ninja, "check-llvm"],
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
-    factory.addStep(LitTestCommand(
-            name            = 'test_llvm',
-            locks = [win7_cyg_lock.access('exclusive')],
-            command         = [
-                "c:/Python27/python.exe",
-                "bin/llvm-lit",
-                "-v",
-                "test",
-                ],
-            description     = ["testing", "llvm"],
-            descriptionDone = ["test",    "llvm"]))
+    AddLitDOS(factory, "llvm", "test")
 
     factory.addStep(ShellCommand(
             command=[
@@ -1280,17 +1312,7 @@ def get_builders():
             command         = [ninja, "check-clang"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
-    factory.addStep(LitTestCommand(
-            name            = 'test_clang',
-            locks = [win7_cyg_lock.access('exclusive')],
-            command         = [
-                "c:/Python27/python.exe",
-                "bin/llvm-lit",
-                "-v",
-                "tools/clang/test",
-                ],
-            description     = ["testing", "clang"],
-            descriptionDone = ["test",    "clang"]))
+    AddLitDOS(factory, "clang", "tools/clang/test")
 
     factory.addStep(Compile(
             name            = 'build_clang_tools',
@@ -1306,16 +1328,7 @@ def get_builders():
             command         = [ninja, "check-clang-tools"],
             description     = ["building", "tools"],
             descriptionDone = ["built",    "tools"]))
-    factory.addStep(LitTestCommand(
-            name            = 'test_clang_tools',
-            command         = [
-                "c:/Python27/python.exe",
-                "bin/llvm-lit",
-                "-v",
-                "tools/clang/tools/extra/test",
-                ],
-            description     = ["testing", "tools"],
-            descriptionDone = ["test",    "tools"]))
+    AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
 
     factory.addStep(Compile(
             command=[ninja],
@@ -1335,7 +1348,7 @@ def get_builders():
         env={
             'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
             'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
-            'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};E:\bb-win7',
+            'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};C:\bb-win7',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
             'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
@@ -1386,32 +1399,9 @@ def get_builders():
                 "rm", "-rf",
                 WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
-    factory.addStep(LitTestCommand(
-            name="test_clang",
-            locks = [win7_cyg_lock.access('exclusive')],
-            command=["c:/Python27/python.exe",
-                     "../llvm-project/llvm/utils/lit/lit.py",
-                     "--param", "build_config=Release",
-                     "--param", "build_mode=Release",
-                     "-v",
-                     "tools/clang/test"]))
-    factory.addStep(LitTestCommand(
-            name="test_extra",
-            command=["c:/Python27/python.exe",
-                     "../llvm-project/llvm/utils/lit/lit.py",
-                     "--param", "build_config=Release",
-                     "--param", "build_mode=Release",
-                     "-v",
-                     "tools/clang/tools/extra/test"]))
-    factory.addStep(LitTestCommand(
-            name="test_llvm",
-            locks = [win7_cyg_lock.access('exclusive')],
-            command=["c:/Python27/python.exe",
-                     "../llvm-project/llvm/utils/lit/lit.py",
-                     "--param", "build_config=Release",
-                     "--param", "build_mode=Release",
-                     "-v",
-                     "test"]))
+    AddLitDOS(factory, "clang", "tools/clang/test", build_mode='Release')
+    AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", build_mode='Release', lock=False)
+    AddLitDOS(factory, "llvm", "test", build_mode='Release')
     BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-x64-msc16-R",
