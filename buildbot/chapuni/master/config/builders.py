@@ -175,8 +175,8 @@ def AddCMakeCentOS5(factory,
 def AddCMakeCentOS6(factory,
                     LLVM_TARGETS_TO_BUILD="all",
                     LLVM_LIT_ARGS="-v",
-                    CMAKE_C_COMPILER="/home/bb/bin/gcc",
-                    CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+                    CMAKE_C_COMPILER="/home/bb/bin/gcc47",
+                    CMAKE_CXX_COMPILER="/home/bb/bin/g++47",
                     **kwargs):
     AddCMake(
         factory, "Unix Makefiles",
@@ -191,12 +191,14 @@ def AddCMakeCentOS6(factory,
 def AddCMakeCentOS6Ninja(factory,
                          LLVM_TARGETS_TO_BUILD="all",
                          LLVM_LIT_ARGS="-v",
+                         CMAKE_C_COMPILER="/home/bb/bin/gcc47",
+                         CMAKE_CXX_COMPILER="/home/bb/bin/g++47",
                          **kwargs):
     AddCMake(
         factory, "Ninja",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
         CMAKE_BUILD_TYPE="Release",
+        CMAKE_C_COMPILER=CMAKE_C_COMPILER,
+        CMAKE_CXX_COMPILER=CMAKE_CXX_COMPILER,
         LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
@@ -226,6 +228,19 @@ def AddLitDOS(factory, name, dir, lock=True, build_mode='.'):
                 ],
             description     = ["testing", name],
             descriptionDone = ["test",    name]))
+
+def AddCleanBin(factory):
+    factory.addStep(ShellCommand(
+            name            = 'rmbin',
+            command         = [
+                "find",
+                "bin",
+                "-type", "f",
+                "-not", "-name", "*-tblgen",
+                "-not", "-name", "llvm-lit",
+                "-exec", "rm", "-v", "{}", ";",
+                ],
+            ))
 
 def BuildStageN(factory, n,
                 root="builds"):
@@ -567,6 +582,7 @@ def get_builders():
                    '/var/cache/llvm-project.git')
 
     BlobPre(factory)
+    AddCleanBin(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
@@ -644,6 +660,8 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
+    AddCleanBin(factory)
+
     PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     AddCMakeCentOS6Ninja(
@@ -701,10 +719,13 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
+    AddCleanBin(factory)
+
     PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     AddCMakeCentOS6Ninja(
         factory,
+        LLVM_TARGETS_TO_BUILD="X86",
         LLVM_BUILD_EXAMPLES="OFF",
         LLVM_BUILD_RUNTIME="OFF",
         LLVM_BUILD_TESTS="OFF",
@@ -818,6 +839,7 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
+    AddCleanBin(factory)
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -825,8 +847,6 @@ def get_builders():
                     LLVM_TARGETS_TO_BUILD="X86",
                     LLVM_ENABLE_ASSERTIONS="ON",
                     LLVM_BUILD_EXAMPLES="ON",
-                    CMAKE_C_COMPILER="/home/bb/bin/gcc47",
-                    CMAKE_CXX_COMPILER="/home/bb/bin/g++47",
                     CLANG_BUILD_EXAMPLES="ON",
                     prefix="builds/install/stage1")
     factory.addStep(Compile(name="stage1_build",

@@ -16,9 +16,10 @@ def Tcmake(l):
 def Tllvmlib(l):
     return filter_t(l, r'^llvm/(include|lib|tools|utils)/')
 def Fllvmtest(l): return filter_f(l, r'^llvm/test/.+/')
+def Fclangtest(l): return filter_f(l, r'^clang/test/.+/')
 def Fhtml(l): return filter_f(l, r'\.(TXT|html|rst)(\.\w)?$')
 def FGNUmake(l): return filter_f(l, r'/Makefile(\.\w+)?$')
-def Fautoconf(l): return filter_f(FGNUmake(l), r'^llvm/autoconf/')
+def Fautoconf(l): return filter_f(FGNUmake(l), r'^llvm/(autoconf/|config.*)')
 def Fcmakefiles(l): return filter_f(l, r'/CMakeLists\.txt$')
 def Fcmake(l): return filter_f(Fcmakefiles(l), r'^llvm/cmake/')
 
@@ -75,7 +76,7 @@ def filter_cmake_tools(change):
     l = Tclang(l) + Tllvm(l) + Tclang_extra(l)
     if len(Tcmake(l)) > 0:
         return True
-    return len(Fllvmtest(Fhtml(l))) > 0
+    return len(Fclangtest(Fllvmtest(Fhtml(l)))) > 0
 
 change_tools_master = ChangeFilter(filter_fn = filter_cmake_tools,
                                    #branch=['master'],
@@ -196,6 +197,7 @@ def get_schedulers():
         name="force",
         builderNames=[
             "cmake-clang-x86_64-linux",
+            "cmake-clang-tools-x86_64-linux",
             "cmake-clang-i686-mingw32",
             "ninja-clang-i686-msc17-R",
             "cmake-clang-x64-msc16-R",
