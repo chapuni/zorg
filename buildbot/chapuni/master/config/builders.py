@@ -42,7 +42,16 @@ centos6_lock = locks.SlaveLock("centos6_lock")
 win7_git_lock = locks.SlaveLock("win7_git_lock")
 win7_cyg_lock = locks.MasterLock("win7_cyg_lock")
 
-def CheckMakefile(factory, makefile="Makefile"):
+def dospaths(dirs):
+    normdirs = []
+    for dir in dirs:
+        if dir=="${PATH}":
+            normdirs.append(dir)
+        else:
+            normdirs.append(dir.replace('/', '\\'))
+    return ';'.join(normdirs)
+
+def CheckMakefile(factory, makefile="Makefile", workdir="build"):
     factory.addStep(SetPropertyFromCommand(
             name="Makefile_isready",
             command=[
@@ -50,6 +59,7 @@ def CheckMakefile(factory, makefile="Makefile"):
                 "test -e " + makefile + "&& echo OK",
                 ],
             flunkOnFailure=False,
+            workdir=workdir,
             property="exists_Makefile"))
 
 # Factories
@@ -144,20 +154,28 @@ def AddCMake(factory, G,
              prefix="install",
              buildClang=True,
              doStepIf=True,
+             workdir="build",
              **kwargs):
+
     cmd = ["cmake", "-G"+G]
     cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
+    cmd.append("-DLLVM_ENABLE_CXX11=ON")
     cmd.append("-DLLVM_BUILD_TESTS=ON")
     if buildClang:
         cmd.append("-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%s/../clang" % source)
     for i in sorted(kwargs.items()):
-        cmd.append("-D%s=%s" % i)
+        if i[0].startswith("__"):
+            cmd.append(i[1])
+        else:
+            cmd.append("-D%s=%s" % i)
     cmd.append(source)
-    factory.addStep(ShellCommand(name="CMake",
-                                 description="configuring CMake",
-                                 descriptionDone="CMake",
-                                 command=cmd,
-                                 doStepIf=doStepIf))
+    factory.addStep(ShellCommand(
+            name="CMake",
+            description="configuring CMake",
+            descriptionDone="CMake",
+            command=cmd,
+            workdir=workdir,
+            doStepIf=doStepIf))
 
 def AddCMakeCentOS5(factory,
                     LLVM_TARGETS_TO_BUILD="all",
@@ -212,7 +230,11 @@ def AddCMakeDOS(factory, G,
              LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
              **kwargs)
 
-def AddLitDOS(factory, name, dir, lock=True, build_mode='.'):
+def AddLitDOS(factory, name, dir,
+              lit="../llvm-project/llvm/utils/lit/lit.py",
+              lock=True,
+              workdir="build",
+              build_mode='.'):
     locks = []
     if lock:
         locks = [win7_cyg_lock.access('exclusive')]
@@ -220,16 +242,19 @@ def AddLitDOS(factory, name, dir, lock=True, build_mode='.'):
             name            = 'test-' + name,
             locks = locks,
             command         = [
-                "c:/Python27/python.exe",
-                "../llvm-project/llvm/utils/lit/lit.py",
+                "c:/Python27/python.exe", lit,
                 "-v",
                 "--param", "build_mode="+build_mode,
                 dir,
                 ],
+            workdir=workdir,
             description     = ["testing", name],
             descriptionDone = ["test",    name]))
 
 def AddCleanBin(factory):
+    factory.addStep(MakeDirectory(
+            dir=WithProperties("%(workdir)s/build/bin"),
+            flunkOnFailure=False))
     factory.addStep(ShellCommand(
             name            = 'rmbin',
             command         = [
@@ -1181,18 +1206,18 @@ def get_builders():
             locks = [win7_cyg_lock.access('exclusive')],
             command=["make", "LIT_ARGS=-v -j8 --use-processes", "check"]))
     BlobPost(factory)
-    yield BuilderConfig(
-        name="clang-i686-msys",
-        category="Windows",
-        mergeRequests=True,
-        slavenames=["win7"],
-        env={
-            'LIT_USE_INTERNAL_SHELL': '0',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="clang-i686-msys",
+    #     category="Windows",
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'LIT_USE_INTERNAL_SHELL': '0',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # cmake-msys
     factory = BuildFactory()
@@ -1267,8 +1292,59 @@ def get_builders():
             ))
 
     BlobPost(factory)
+    # yield BuilderConfig(
+    #     name="cmake-clang-i686-mingw32",
+    #     category="Windows",
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
+
+
+    # ninja-clang-x64-mingw64-RA
+    gccpath = "C:/mingw-builds/x64-4.8.1-posix-seh-rev5/mingw64/bin"
+    factory = BuildFactory()
+    AddGitWin7(factory)
+    BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeDOS(
+        factory, "Ninja",
+        CMAKE_BUILD_TYPE="Release",
+        LLVM_ENABLE_ASSERTIONS="ON",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        CMAKE_C_COMPILER=gccpath+"/gcc.exe",
+        CMAKE_CXX_COMPILER=gccpath+"/g++.exe",
+        doStepIf=Makefile_not_ready)
+
+    factory.addStep(Compile(
+            name            = 'build',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-all"],
+            description     = ["building", "llvmclang"],
+            descriptionDone = ["built",    "llvmclang"]))
+
+    AddLitDOS(factory, "clang", "tools/clang/test")
+
+    AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
+
+    AddLitDOS(factory, "llvm", "test")
+
+    factory.addStep(Compile(
+            command=[ninja, "install"],
+            #locks = [win7_cyg_lock.access('exclusive')],
+            ))
+
+    BlobPost(factory)
     yield BuilderConfig(
-        name="cmake-clang-i686-mingw32",
+        name="ninja-clang-x64-mingw64-RA",
         category="Windows",
         mergeRequests=True,
         slavenames=["win7"],
@@ -1276,6 +1352,7 @@ def get_builders():
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
             'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            'PATH':   dospaths([gccpath, "${PATH}", "C:/bb-win7"]),
             },
         factory=factory)
 
@@ -1298,6 +1375,22 @@ def get_builders():
         CMAKE_C_COMPILER="D:/Program Files (x86)/Microsoft Visual Studio 11.0/VC/bin/cl.exe",
         CMAKE_CXX_COMPILER="D:/Program Files (x86)/Microsoft Visual Studio 11.0/VC/bin/cl.exe",
         doStepIf=Makefile_not_ready)
+
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-clang-tools"],
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            #locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-clang-tools"],
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
+    AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
 
     factory.addStep(Compile(
             name            = 'build_llvm',
@@ -1335,22 +1428,6 @@ def get_builders():
     AddLitDOS(factory, "clang", "tools/clang/test")
 
     factory.addStep(Compile(
-            name            = 'build_clang_tools',
-            #locks = [win7_cyg_lock.access('exclusive')],
-            command         = [ninja, "check-clang-tools"],
-            haltOnFailure = False,
-            flunkOnFailure=False,
-            description     = ["building", "tools"],
-            descriptionDone = ["built",    "tools"]))
-    factory.addStep(Compile(
-            name            = 'build_clang_tools',
-            #locks = [win7_cyg_lock.access('exclusive')],
-            command         = [ninja, "check-clang-tools"],
-            description     = ["building", "tools"],
-            descriptionDone = ["built",    "tools"]))
-    AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
-
-    factory.addStep(Compile(
             command=[ninja],
             #locks = [win7_cyg_lock.access('exclusive')],
             ))
@@ -1374,6 +1451,132 @@ def get_builders():
             'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
             },
         factory=factory)
+
+    # msc17 x64
+    msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
+    factory = BuildFactory()
+    AddGitWin7(factory)
+    BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
+
+    # wd="builds/tblgen"
+    # CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    # AddCMakeDOS(
+    #     factory, "Visual Studio 11 Win64",
+    #     source="../../llvm-project/llvm",
+    #     workdir=wd,
+    #     doStepIf=Makefile_not_ready)
+    # factory.addStep(Compile(
+    #         name="zero_check",
+    #         haltOnFailure = False,
+    #         flunkOnFailure=False,
+    #         warnOnFailure=True,
+    #         timeout=3600,
+    #         workdir=wd,
+    #         command=[
+    #             msbuild,
+    #             "-m",
+    #             "-v:m",
+    #             "-p:Configuration=Release",
+    #             "ZERO_CHECK.vcxproj"]))
+    # factory.addStep(Compile(
+    #         name="llvm_tblgen",
+    #         timeout=3600,
+    #         locks = [win7_cyg_lock.access('exclusive')],
+    #         workdir=wd,
+    #         command=[
+    #             msbuild,
+    #             "-m:4",
+    #             "-v:m",
+    #             "-p:Configuration=Release",
+    #             "utils/TableGen/llvm-tblgen.vcxproj"]))
+    # factory.addStep(SetProperty(
+    #         property="exists_Makefile",
+    #         value=''))
+
+    wd="builds/llvm"
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 11 Win64",
+        source="../../llvm-project/llvm",
+        prefix="install/llvm",
+        buildClang=False,
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%%(workdir)s/%s/Release/bin/llvm-tblgen.exe" % wd),
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Release"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Release",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_llvm_tblgen",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Release",
+                "utils/TableGen/llvm-tblgen.vcxproj"]))
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Debug"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_llvm",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "test/check-llvm.vcxproj"]))
+    AddLitDOS(factory, "llvm", "test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              workdir=wd,
+              build_mode='Release')
+
+    BlobPost(factory)
+    yield BuilderConfig(
+        name="msbuild-llvmclang-x64-msc17-DA",
+        category="Windows",
+        mergeRequests=True,
+        slavenames=["win7"],
+        env={
+            'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
+            'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
+            'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};C:\bb-win7',
+            'VisualStudioVersion': '11.0',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
 
     # msc16 x64
     msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
@@ -1423,18 +1626,18 @@ def get_builders():
     AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", build_mode='Release', lock=False)
     AddLitDOS(factory, "llvm", "test", build_mode='Release')
     BlobPost(factory)
-    yield BuilderConfig(
-        name="cmake-clang-x64-msc16-R",
-        category="Windows",
-        mergeRequests=True,
-        slavenames=["win7"],
-        env={
-            'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="cmake-clang-x64-msc16-R",
+    #     category="Windows",
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # MSVC10
     msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
