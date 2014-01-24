@@ -56,7 +56,7 @@ def CheckMakefile(factory, makefile="Makefile", workdir="build"):
             name="Makefile_isready",
             command=[
                 "sh", "-c",
-                "test -e " + makefile + "&& echo OK",
+                "test -e %s && echo OK" % makefile,
                 ],
             flunkOnFailure=False,
             workdir=workdir,
@@ -522,6 +522,18 @@ def PatchLLVMClang(factory, name):
             flunkOnFailure=False,
             workdir="llvm-project"))
 
+def BlobAdd(factory, dirs):
+    factory.addStep(ShellCommand(
+            name="blob-add",
+            description="Adding blob",
+            descriptionDone="Added blob",
+            command=[
+                "pythonw", "../blob.py", "ADD",
+                ] + dirs,
+            flunkOnFailure=False,
+            timeout=3600,
+            workdir="."))
+
 def BlobPre(factory):
     factory.addStep(ShellCommand(
             name="blob-prebuild",
@@ -573,7 +585,7 @@ def BlobPost(factory):
                 ],
             flunkOnFailure=False,
             alwaysRun=True,
-            timeout=3600,
+            timeout=3 * 3600,
             workdir="."))
 
 def get_builders():
@@ -1330,12 +1342,25 @@ def get_builders():
             command         = [ninja, "check-all"],
             description     = ["building", "llvmclang"],
             descriptionDone = ["built",    "llvmclang"]))
+    BlobAdd(factory, [
+            "build/bin",
+            "build/include",
+            "build/lib",
+            "build/unittests",
+            "build/utils",
+            "build/tools/clang/include",
+            "build/tools/clang/lib",
+            "build/tools/clang/unittests",
+            ])
 
     AddLitDOS(factory, "clang", "tools/clang/test")
+    BlobAdd(factory, ["build/tools/clang/test"])
 
     AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
+    BlobAdd(factory, ["build/tools/clang"])
 
     AddLitDOS(factory, "llvm", "test")
+    BlobAdd(factory, ["build/*"])
 
     factory.addStep(Compile(
             command=[ninja, "install"],
@@ -1390,7 +1415,15 @@ def get_builders():
             command         = [ninja, "check-clang-tools"],
             description     = ["building", "tools"],
             descriptionDone = ["built",    "tools"]))
+    BlobAdd(factory, [
+            "build/bin",
+            "build/include",
+            "build/lib",
+            ])
     AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
+    BlobAdd(factory, [
+            "build/tools",
+            ])
 
     factory.addStep(Compile(
             name            = 'build_llvm',
@@ -1405,13 +1438,17 @@ def get_builders():
             command         = [ninja, "check-llvm"],
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
+    BlobAdd(factory, [
+            "build/bin",
+            "build/include",
+            "build/lib",
+            "build/tools",
+            "build/unittests",
+            "build/utils",
+            ])
     AddLitDOS(factory, "llvm", "test")
+    BlobAdd(factory, ["build/test"])
 
-    factory.addStep(ShellCommand(
-            command=[
-                "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
-            flunkOnFailure=False))
     factory.addStep(Compile(
             name            = 'build_clang',
             locks = [win7_cyg_lock.access('exclusive')],
@@ -1425,12 +1462,22 @@ def get_builders():
             command         = [ninja, "check-clang"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
+    BlobAdd(factory, [
+            "build/bin",
+            "build/lib",
+            "build/tools/clang/include",
+            "build/tools/clang/lib",
+            "build/tools/clang/tools",
+            "build/tools/clang/unittests",
+            ])
     AddLitDOS(factory, "clang", "tools/clang/test")
+    BlobAdd(factory, ["build/tools/clang"])
 
     factory.addStep(Compile(
             command=[ninja],
             #locks = [win7_cyg_lock.access('exclusive')],
             ))
+    BlobAdd(factory, ["build/*"])
     factory.addStep(Compile(
             command=[ninja, "install"],
             #locks = [win7_cyg_lock.access('exclusive')],
@@ -1459,50 +1506,13 @@ def get_builders():
     BlobPre(factory)
     PatchLLVMClang(factory, "llvmclang.diff")
 
-    # wd="builds/tblgen"
-    # CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
-    # AddCMakeDOS(
-    #     factory, "Visual Studio 11 Win64",
-    #     source="../../llvm-project/llvm",
-    #     workdir=wd,
-    #     doStepIf=Makefile_not_ready)
-    # factory.addStep(Compile(
-    #         name="zero_check",
-    #         haltOnFailure = False,
-    #         flunkOnFailure=False,
-    #         warnOnFailure=True,
-    #         timeout=3600,
-    #         workdir=wd,
-    #         command=[
-    #             msbuild,
-    #             "-m",
-    #             "-v:m",
-    #             "-p:Configuration=Release",
-    #             "ZERO_CHECK.vcxproj"]))
-    # factory.addStep(Compile(
-    #         name="llvm_tblgen",
-    #         timeout=3600,
-    #         locks = [win7_cyg_lock.access('exclusive')],
-    #         workdir=wd,
-    #         command=[
-    #             msbuild,
-    #             "-m:4",
-    #             "-v:m",
-    #             "-p:Configuration=Release",
-    #             "utils/TableGen/llvm-tblgen.vcxproj"]))
-    # factory.addStep(SetProperty(
-    #         property="exists_Makefile",
-    #         value=''))
-
-    wd="builds/llvm"
+    wd="builds/tblgen"
     CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
     AddCMakeDOS(
         factory, "Visual Studio 11 Win64",
         source="../../llvm-project/llvm",
         prefix="install/llvm",
-        buildClang=False,
-        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%%(workdir)s/%s/Release/bin/llvm-tblgen.exe" % wd),
-        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        #LLVM_TARGETS_TO_BUILD="X86",
         workdir=wd,
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
@@ -1522,7 +1532,6 @@ def get_builders():
     factory.addStep(Compile(
             name="build_llvm_tblgen",
             timeout=3600,
-            locks = [win7_cyg_lock.access('exclusive')],
             workdir=wd,
             command=[
                 msbuild,
@@ -1530,6 +1539,20 @@ def get_builders():
                 "-v:m",
                 "-p:Configuration=Release",
                 "utils/TableGen/llvm-tblgen.vcxproj"]))
+    BlobAdd(factory, [wd])
+
+    wd="builds/llvm"
+    factory.addStep(SetProperty(property="exists_Makefile", value=''))
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 11 Win64",
+        source="../../llvm-project/llvm",
+        prefix="install/llvm",
+        buildClang=False,
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             name="zero_check",
             haltOnFailure = False,
@@ -1555,10 +1578,153 @@ def get_builders():
                 "-v:m",
                 "-p:Configuration=Debug",
                 "test/check-llvm.vcxproj"]))
+    BlobAdd(factory, [
+            wd+"/Debug",
+            wd+"/include",
+            wd+"/lib",
+            wd+"/unittests",
+            wd+"/utils",
+            ])
     AddLitDOS(factory, "llvm", "test",
               lit="../../llvm-project/llvm/utils/lit/lit.py",
               workdir=wd,
-              build_mode='Release')
+              build_mode='Debug')
+    BlobAdd(factory, [wd+"/test"])
+    factory.addStep(Compile(
+            name="build_llvm_all",
+            timeout=3600,
+            #locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "LLVM.sln"]))
+    BlobAdd(factory, [wd])
+    factory.addStep(Compile(
+            name="install_llvm",
+            timeout=3600,
+            #locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "INSTALL.vcxproj"]))
+    BlobAdd(factory, ["install/llvm"])
+
+    wd="builds/tblgen"
+    factory.addStep(Compile(
+            name="build_clang_tblgen",
+            timeout=3600,
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Release",
+                "tools/clang/utils/TableGen/clang-tblgen.vcxproj"]))
+    BlobAdd(factory, [wd])
+
+    wd="builds/clang"
+    factory.addStep(SetProperty(property="exists_Makefile", value=''))
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 11 Win64",
+        source="../../llvm-project/clang",
+        prefix="install/clang",
+        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(workdir)s/install/llvm/bin/llvm-config.exe"),
+        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
+        CMAKE_CXX_FLAGS="/DWIN32 /D_WINDOWS /W3 /Zm1000 /bigobj /GR /EHsc",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Debug"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_clang_tools",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "tools/extra/test/check-clang-tools.vcxproj"]))
+
+    AddLitDOS(factory, "clang-tools", "tools/extra/test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              workdir=wd,
+              lock=False,
+              build_mode='Debug')
+    BlobAdd(factory, [
+            wd+"/Debug",
+            wd+"/lib",
+            wd+"/tools",
+            wd+"/unittests",
+            ])
+    factory.addStep(Compile(
+            name="build_clang",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "test/check-clang.vcxproj"]))
+    BlobAdd(factory, [
+            wd+"/Debug",
+            wd+"/include",
+            wd+"/lib",
+            wd+"/tools",
+            wd+"/unittests",
+            ])
+    AddLitDOS(factory, "clang", "test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              workdir=wd,
+              build_mode='Debug')
+    BlobAdd(factory, [wd+"/test"])
+    factory.addStep(Compile(
+            name="build_clang_all",
+            timeout=3600,
+            #locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "Clang.sln"]))
+    BlobAdd(factory, [wd])
+    factory.addStep(Compile(
+            name="install_clang",
+            timeout=3600,
+            #locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "INSTALL.vcxproj"]))
 
     BlobPost(factory)
     yield BuilderConfig(

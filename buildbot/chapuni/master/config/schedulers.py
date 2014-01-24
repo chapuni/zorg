@@ -153,7 +153,7 @@ def get_schedulers():
     llvmclang_msc17_x64 = AnyBranchScheduler(
         name="s_msbuild-llvmclang-x64-msc17-DA",
         change_filter = change_cmake_llvmclang,
-        treeStableTimer=15 * 60,
+        treeStableTimer=30 * 60,
         upstreams=[llvmclang_msc17],
         builderNames=[
             "msbuild-llvmclang-x64-msc17-DA",
@@ -194,7 +194,7 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="s_clang-3stage-i686-cygwin",
         change_filter = change_autoconf_llvmclang,
-        treeStableTimer=60 * 60,
+        treeStableTimer=45 * 60,
         upstreams=[
             cyg_centos6,
             llvmclang_mingw64,
