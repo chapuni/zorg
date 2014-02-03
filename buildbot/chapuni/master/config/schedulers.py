@@ -11,6 +11,7 @@ def filter_f(l, e): return filter(lambda x: not re.search(e, x), l)
 def Tllvm(l): return filter_t(l, r'^llvm/')
 def Tclang(l): return filter_t(l, r'^clang/')
 def Tclang_extra(l): return filter_t(l, r'^clang-tools-extra/')
+def Tdragonegg(l): return filter_t(l, r'^dragonegg/')
 def Tcmake(l):
     return filter_t(l, r'^llvm/cmake/') + filter_t(l, r'/CMakeLists\.txt$')
 def Tllvmlib(l):
@@ -38,11 +39,11 @@ change_llvm_master = ChangeFilter(filter_fn = filter_cmake_llvm,
                                   #branch=['master'],
                                   )
 
-def filter_llvmclang(change):
+def filter_all(change):
     l = Fhtml(getattr(change, "files"))
-    return len(Tclang(l) + Tllvm(l)) > 0
+    return len(Tclang(l) + Tllvm(l) + Tdragonegg(l)) > 0
 
-change_llvmclang = ChangeFilter(filter_fn = filter_llvmclang)
+change_llvmclang = ChangeFilter(filter_fn = filter_all)
 
 def filter_autoconf_llvmclang(change):
     l = Fcmake(getattr(change, "files"))

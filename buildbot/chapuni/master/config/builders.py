@@ -876,15 +876,17 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
-    AddCleanBin(factory)
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
     PatchLLVMClang(factory, "llvmclang.diff")
+
+    # stage 1
     AddCMakeCentOS6(factory,
                     LLVM_TARGETS_TO_BUILD="X86",
                     LLVM_ENABLE_ASSERTIONS="ON",
                     LLVM_BUILD_EXAMPLES="ON",
                     CLANG_BUILD_EXAMPLES="ON",
+                    LLVM_EXTERNAL_DRAGONEGG_SOURCE_DIR="../llvm-project/dragonegg",
                     prefix="builds/install/stage1")
     factory.addStep(Compile(name="stage1_build",
                             command=["make", "-j8", "-l8.2", "-k"]))
@@ -895,13 +897,25 @@ def get_builders():
             descriptionDone = ["test",    "llvm"],
             timeout=60,
             ))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
-                                    flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "-j8", "-k", "check-clang"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"],
+            timeout=60,
+            ))
+    factory.addStep(LitTestCommand(
+            name            = 'stage1_test_validator',
+            command         = ["make", "-j8", "-k", "check-dragonegg-validator"],
+            description     = ["testing", "validator"],
+            descriptionDone = ["test",    "validator"],
+            timeout=60,
+            ))
+    factory.addStep(LitTestCommand(
+            name            = 'stage1_test_compilator',
+            command         = ["make", "-j8", "-k", "check-dragonegg-compilator"],
+            description     = ["testing", "compilator"],
+            descriptionDone = ["test",    "compilator"],
             timeout=60,
             ))
     factory.addStep(Compile(name="stage1_install",
@@ -1415,14 +1429,9 @@ def get_builders():
             command         = [ninja, "check-clang-tools"],
             description     = ["building", "tools"],
             descriptionDone = ["built",    "tools"]))
-    BlobAdd(factory, [
-            "build/bin",
-            "build/include",
-            "build/lib",
-            ])
     AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
     BlobAdd(factory, [
-            "build/tools",
+            "build/tools/clang",
             ])
 
     factory.addStep(Compile(
