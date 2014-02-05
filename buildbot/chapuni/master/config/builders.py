@@ -202,6 +202,8 @@ def AddCMakeCentOS6(factory,
         CMAKE_C_COMPILER=CMAKE_C_COMPILER,
         CMAKE_CXX_COMPILER=CMAKE_CXX_COMPILER,
         CMAKE_BUILD_TYPE="Release",
+        LLVM_ENABLE_TIMESTAMPS="OFF",
+        CMAKE_CXX_CREATE_STATIC_LIBRARY="<CMAKE_AR> crsD <TARGET> <LINK_FLAGS> <OBJECTS>",
         LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
@@ -217,6 +219,8 @@ def AddCMakeCentOS6Ninja(factory,
         CMAKE_BUILD_TYPE="Release",
         CMAKE_C_COMPILER=CMAKE_C_COMPILER,
         CMAKE_CXX_COMPILER=CMAKE_CXX_COMPILER,
+        LLVM_ENABLE_TIMESTAMPS="OFF",
+        CMAKE_CXX_CREATE_STATIC_LIBRARY="<CMAKE_AR> crsD <TARGET> <LINK_FLAGS> <OBJECTS>",
         LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
@@ -966,6 +970,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                "-C",
                 "CC=/home/bb/bin/gcc47",
                 "CXX=/home/bb/bin/g++47",
                 WithProperties("--prefix=%(workdir)s/install"),
@@ -973,6 +978,7 @@ def get_builders():
                 "--target=i686-pc-cygwin",
                 "--enable-optimized",
                 "--enable-targets=x86",
+                "--disable-timestamps",
                 "--with-optimize-option=-O2",
                 ],
             name="configure",
@@ -993,6 +999,8 @@ def get_builders():
             locks=[centos6_lock.access('counting')],
             command=[
                 "make",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
                 "-k",
                 "-j8",
                 ],
@@ -1008,6 +1016,8 @@ def get_builders():
             command=[
                 "make",
                 "VERBOSE=1",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
                 "install",
                 "-j8"],
             ))
@@ -1054,21 +1064,39 @@ def get_builders():
                 WithProperties("--prefix=%(workdir)s/builds/install/stage1"),
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "LIBS=-static",
+                "--disable-timestamps",
                 "--enable-targets=x86",
                 #"--enable-shared",
                 "--with-optimize-option=-O1",
                 "--enable-optimized"]))
-    factory.addStep(Compile(name="stage1_build_quick",
-                            haltOnFailure = False,
-                            flunkOnFailure=False,
-                            locks = [win7_cyg_lock.access('exclusive')],
-                            command=["make", "-j8", "-k"]))
-    factory.addStep(Compile(name="stage1_build_quick",
-                            haltOnFailure = False,
-                            flunkOnFailure=False,
-                            command=["make", "-j8", "-k"]))
-    factory.addStep(Compile(name="stage1_build",
-                            command=["make", "-k"]))
+    factory.addStep(Compile(
+            name="stage1_build_quick",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            locks = [win7_cyg_lock.access('exclusive')],
+            command=[
+                "make",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "-j8",
+                "-k"]))
+    factory.addStep(Compile(
+            name="stage1_build_quick",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            command=[
+                "make",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "-j8",
+                "-k"]))
+    factory.addStep(Compile(
+            name="stage1_build",
+            command=[
+                "make",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "-k"]))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
             command         = ["make", "LIT_ARGS=--use-processes -v -j8", "check"],
@@ -1089,8 +1117,14 @@ def get_builders():
             flunkOnWarnings = False,
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"]))
-    factory.addStep(Compile(name="stage1_install",
-                            command=["make", "install", "-k"]))
+    factory.addStep(Compile(
+            name="stage1_install",
+            command=[
+                "make",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "install",
+                "-k"]))
 
     # stage 2
     BuildStageNcyg(factory, 2)
@@ -1683,10 +1717,7 @@ def get_builders():
               lock=False,
               build_mode='Debug')
     BlobAdd(factory, [
-            wd+"/Debug",
-            wd+"/lib",
-            wd+"/tools",
-            wd+"/unittests",
+            wd+"/tools/extra",
             ])
     factory.addStep(Compile(
             name="build_clang",

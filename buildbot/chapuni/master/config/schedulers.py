@@ -155,7 +155,7 @@ def get_schedulers():
         name="s_msbuild-llvmclang-x64-msc17-DA",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=30 * 60,
-        upstreams=[llvmclang_msc17],
+        upstreams=[llvmclang_msc17,llvmclang_mingw64],
         builderNames=[
             "msbuild-llvmclang-x64-msc17-DA",
             ])
