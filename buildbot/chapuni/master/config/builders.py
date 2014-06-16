@@ -41,6 +41,10 @@ centos5_lock = locks.SlaveLock("centos5_lock")
 centos6_lock = locks.SlaveLock("centos6_lock")
 win7_git_lock = locks.SlaveLock("win7_git_lock")
 win7_cyg_lock = locks.MasterLock("win7_cyg_lock")
+win7_cyg_glock = locks.MasterLock(
+    "win7_cyg_lock",
+    maxCount=4,
+    )
 
 def dospaths(dirs):
     normdirs = []
@@ -203,7 +207,7 @@ def AddCMakeCentOS6(factory,
         CMAKE_CXX_COMPILER=CMAKE_CXX_COMPILER,
         CMAKE_BUILD_TYPE="Release",
         LLVM_ENABLE_TIMESTAMPS="OFF",
-        CMAKE_CXX_CREATE_STATIC_LIBRARY="<CMAKE_AR> crsD <TARGET> <LINK_FLAGS> <OBJECTS>",
+        CMAKE_CXX_CREATE_STATIC_LIBRARY="<CMAKE_COMMAND> -E remove <TARGET>;<CMAKE_AR> crsD <TARGET> <LINK_FLAGS> <OBJECTS>",
         LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
@@ -220,7 +224,7 @@ def AddCMakeCentOS6Ninja(factory,
         CMAKE_C_COMPILER=CMAKE_C_COMPILER,
         CMAKE_CXX_COMPILER=CMAKE_CXX_COMPILER,
         LLVM_ENABLE_TIMESTAMPS="OFF",
-        CMAKE_CXX_CREATE_STATIC_LIBRARY="<CMAKE_AR> crsD <TARGET> <LINK_FLAGS> <OBJECTS>",
+        CMAKE_CXX_CREATE_STATIC_LIBRARY="<CMAKE_COMMAND> -E remove <TARGET>;<CMAKE_AR> crsD <TARGET> <LINK_FLAGS> <OBJECTS>",
         LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
@@ -237,10 +241,16 @@ def AddCMakeDOS(factory, G,
 def AddLitDOS(factory, name, dir,
               lit="../llvm-project/llvm/utils/lit/lit.py",
               lock=True,
+              glock=False,
               workdir="build",
               build_mode='.'):
     locks = []
-    if lock:
+    if glock:
+        locks = [
+            win7_cyg_glock.access('exclusive'),
+            win7_cyg_lock.access('exclusive'),
+            ]
+    elif lock:
         locks = [win7_cyg_lock.access('exclusive')]
     factory.addStep(LitTestCommand(
             name            = 'test-' + name,
@@ -332,13 +342,14 @@ def BuildStageN8(factory, n,
     factory.addStep(ShellCommand(
             command=[
                 WithProperties("%(workdir)s/llvm-project/llvm/configure"),
-                WithProperties("CC=%%(workdir)s/%s/clang -std=gnu89" % tools),
+                WithProperties("CC=%%(workdir)s/%s/clang" % tools),
                 WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
                 WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "--disable-timestamps",
                 "--disable-assertions",
-                "--with-optimize-option=-O3 -Wdocumentation -Wno-documentation-deprecated-sync",
+                "--enable-cxx11",
+                "--with-optimize-option=-O3 -Wdocumentation",
                 "--enable-optimized"],
             name="configure",
             description="configuring",
@@ -359,15 +370,81 @@ def BuildStageN8(factory, n,
 
     if n != 3:
         factory.addStep(LitTestCommand(
-                name="test_clang",
-                command=["make", "TESTARGS=-v -j8", "-C", "tools/clang/test"],
+                name="test_llvmclang",
+                command=["make", "LIT_ARGS=-v -j8", "check-all"],
+                timeout=60,
+                locks=[centos6_lock.access('counting')],
                 workdir=workdir,
-                timeout=60,
                 ))
+
+    factory.addStep(Compile(
+            name="install",
+            command=[
+                "make",
+                "VERBOSE=1",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "install",
+                "-j8"],
+            workdir=workdir))
+    factory.addStep(ShellCommand(
+            name="install_fix",
+            command=[
+                "mv", "-v",
+                tmpinst,
+                "%s/stage%d" % (instroot, n)],
+            workdir="."))
+    factory.addStep(ShellCommand(
+            name="builddir_fix",
+            command=[
+                "mv", "-v",
+                workdir,
+                "%s/stage%d" % (root, n)],
+            workdir="."))
+
+def BuildStage32N8(factory, n,
+                 warn = True,
+                 root="builds"):
+    instroot="%s/install" % root
+    workdir="%s/stagen" % root
+    tools="%s/stage%d/bin" % (instroot, n - 1)
+    tmpinst="%s/stagen" % instroot
+    factory.addStep(ShellCommand(
+            command=[
+                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                WithProperties("CC=%%(workdir)s/%s/clang" % tools),
+                WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
+                WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
+                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "--disable-timestamps",
+                "--disable-assertions",
+                "--enable-cxx11",
+                "--with-optimize-option=-m32 -O3 -Wdocumentation",
+                "--build=i686-redhat-linux",
+                "--enable-optimized"],
+            name="configure",
+            description="configuring",
+            descriptionDone="Configure",
+            workdir=workdir))
+    factory.addStep(Compile(
+            name="build",
+            command=[
+                "make",
+                "VERBOSE=1",
+                "-k",
+                "-j8", "-l8.2",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                ],
+            warnOnWarnings = warn,
+            workdir=workdir))
+
+    if n != 3:
         factory.addStep(LitTestCommand(
-                name="test_llvm",
-                command=["make", "LIT_ARGS=-v -j8", "check"],
+                name="test_llvmclang",
+                command=["make", "LIT_ARGS=-v -j8", "check-all"],
                 timeout=60,
+                locks=[centos6_lock.access('counting')],
                 workdir=workdir,
                 ))
 
@@ -412,6 +489,7 @@ def BuildStageNcyg(
                 WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "LIBS=-static",
+                "--enable-cxx11",
                 "--disable-timestamps",
                 "--disable-assertions",
                 "--with-optimize-option=-O3 -Wdocumentation -Wno-documentation-deprecated-sync",
@@ -425,7 +503,10 @@ def BuildStageNcyg(
             haltOnFailure = False,
             flunkOnFailure=False,
             warnOnWarnings = warn,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('exclusive'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             command=[
                 "make",
                 "VERBOSE=1",
@@ -613,7 +694,7 @@ def get_builders():
     #                     slavenames=["centos5"],
     #                     mergeRequests=False,
     #                     locks=[centos5_lock.access('counting')],
-    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}'},
     #                     factory=factory)
 
     # CentOS6(llvm-x86)
@@ -660,12 +741,13 @@ def get_builders():
 
     yield BuilderConfig(
         name="cmake-llvm-x86_64-linux",
-        category="Linux",
+        category="Linux fast",
         slavenames=["centos6"],
-        mergeRequests=False,
+        #mergeRequests=False,
+        mergeRequests=True,
         #locks=[centos6_lock.access('counting')],
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -692,7 +774,7 @@ def get_builders():
     # yield BuilderConfig(name="cmake-clang-x86_64-linux",
     #                     slavenames=["centos5"],
     #                     mergeRequests=False,
-    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}'},
     #                     factory=factory)
 
     # CentOS6(clang only)
@@ -742,11 +824,11 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-x86_64-linux",
-        category="Linux",
+        category="Linux fast",
         slavenames=["centos6"],
         mergeRequests=False,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -803,11 +885,74 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-tools-x86_64-linux",
-        category="Linux",
+        category="Linux fast",
         slavenames=["centos6"],
         mergeRequests=False,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
+    # MS target on CentOS6
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+    BlobPre(factory)
+
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeCentOS6Ninja(
+        factory,
+        LLVM_DEFAULT_TARGET_TRIPLE="x86_64-pc-win32",
+        #BUILD_SHARED_LIBS="ON",
+        LLVM_BUILD_32_BITS="ON",
+        LLVM_ENABLE_ASSERTIONS="ON",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        doStepIf=Makefile_not_ready,
+        )
+    factory.addStep(Compile(
+            name            = 'build_llvmclang',
+            #locks           = [centos6_lock.access('counting')],
+            command         = ["ninja", "-l10", "check-all"],
+            description     = ["building", "llvmclang"],
+            descriptionDone = ["built",    "llvmclang"]))
+    factory.addStep(LitTestCommand(
+            name            = 'test_all',
+            locks           = [centos6_lock.access('counting')],
+            command         = [
+                "bin/llvm-lit",
+                "-v",
+                "test",
+                "tools/clang/test",
+                "tools/clang/tools/extra/test",
+                ],
+            description     = ["testing", "all"],
+            descriptionDone = ["test",    "all"],
+            timeout=60,
+            ))
+    factory.addStep(Compile(
+            #locks           = [centos6_lock.access('counting')],
+            name            = 'build_all',
+            command         = ["ninja"],
+            description     = ["building", "all"],
+            descriptionDone = ["built",    "all"]))
+
+    BlobPost(factory)
+    yield BuilderConfig(
+        name="ninja-x64-msvc-RA-centos6",
+        category="Linux cross",
+        slavenames=["centos6"],
+        mergeRequests=False,
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -871,7 +1016,7 @@ def get_builders():
     # yield BuilderConfig(name="clang-3stage-x86_64-linux",
     #                     slavenames=["centos5"],
     #                     mergeRequests=True,
-    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}'},
+    #                     env={'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}'},
     #                     factory=factory)
 
     # CentOS6(3stage)
@@ -886,19 +1031,23 @@ def get_builders():
 
     # stage 1
     AddCMakeCentOS6(factory,
-                    LLVM_TARGETS_TO_BUILD="X86",
+                    LLVM_TARGETS_TO_BUILD="all",
                     LLVM_ENABLE_ASSERTIONS="ON",
                     LLVM_BUILD_EXAMPLES="ON",
                     CLANG_BUILD_EXAMPLES="ON",
+                    BUILD_SHARED_LIBS="ON",
                     LLVM_EXTERNAL_DRAGONEGG_SOURCE_DIR="../llvm-project/dragonegg",
                     prefix="builds/install/stage1")
-    factory.addStep(Compile(name="stage1_build",
-                            command=["make", "-j8", "-l8.2", "-k"]))
+    factory.addStep(Compile(
+            name="stage1_build",
+            #locks=[centos6_lock.access('counting')],
+            command=["make", "-j8", "-l8.2", "-k"]))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
             command         = ["make", "-j8", "-k", "check-llvm"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"],
+            locks=[centos6_lock.access('counting')],
             timeout=60,
             ))
     factory.addStep(LitTestCommand(
@@ -906,6 +1055,7 @@ def get_builders():
             command         = ["make", "-j8", "-k", "check-clang"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"],
+            locks=[centos6_lock.access('counting')],
             timeout=60,
             ))
     factory.addStep(LitTestCommand(
@@ -920,6 +1070,7 @@ def get_builders():
             command         = ["make", "-j8", "-k", "check-dragonegg-compilator"],
             description     = ["testing", "compilator"],
             descriptionDone = ["test",    "compilator"],
+            locks=[centos6_lock.access('counting')],
             timeout=60,
             ))
     factory.addStep(Compile(name="stage1_install",
@@ -949,7 +1100,124 @@ def get_builders():
         slavenames=["centos6"],
         mergeRequests=True,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.8/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
+    # i686-CentOS6(3stage)
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+    BlobPre(factory)
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+                                    flunkOnFailure=False))
+    PatchLLVMClang(factory, "llvmclang.diff")
+
+    # stage 1 (llvm)
+    wd="builds/stage1-llvm"
+    factory.addStep(ShellCommand(
+            command=[
+                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                "-C",
+                "CC=/home/bb/bin/gcc47",
+                "CXX=/home/bb/bin/g++47",
+                WithProperties("--prefix=%(workdir)s/builds/install/stage1-llvm"),
+                "--enable-cxx11",
+                "--enable-optimized",
+                "--enable-targets=x86",
+                "--disable-timestamps",
+                ],
+            name="configure",
+            description="configuring",
+            descriptionDone="Configure",
+            workdir=wd,
+            ))
+    factory.addStep(Compile(
+            name="build",
+            #locks=[centos6_lock.access('counting')],
+            command=[
+                "make",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "-k",
+                "-j8", "-l8.2",
+                ],
+            workdir=wd,
+            ))
+    factory.addStep(LitTestCommand(
+            name="test_llvm",
+            locks=[centos6_lock.access('counting')],
+            command=["make", "LIT_ARGS=-v -j8", "check"],
+            timeout=60,
+            workdir=wd,
+            ))
+    factory.addStep(Compile(
+            name="install",
+            command=[
+                "make",
+                "VERBOSE=1",
+                "AR.Flags=crsD",
+                "RANLIB=echo",
+                "install",
+                "-j8"],
+            workdir=wd,
+            ))
+
+    # stage 1 (clang)
+    wd="builds/stage1-clang"
+    AddCMakeCentOS6(
+        factory,
+        buildClang=False,
+        source="../../llvm-project/clang",
+        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(workdir)s/builds/install/stage1-llvm/bin/llvm-config"),
+        LLVM_INSTALL_TOOLCHAIN_ONLY="ON",
+        prefix="builds/install/stage1",
+        workdir=wd,
+        )
+    factory.addStep(Compile(
+            name="stage1_build_clang",
+            #locks=[centos6_lock.access('counting')],
+            command=["make", "-j8", "-l8.2", "-k"],
+            workdir=wd,
+            ))
+    factory.addStep(LitTestCommand(
+            name            = 'stage1_test_clang',
+            command         = ["make", "-j8", "-k", "check-all"],
+            description     = ["testing", "clang"],
+            descriptionDone = ["test",    "clang"],
+            locks=[centos6_lock.access('counting')],
+            timeout=60,
+            workdir=wd,
+            ))
+    factory.addStep(Compile(
+            name="stage1_install",
+            command=["make", "install", "-k", "-j8"],
+            workdir=wd,
+            ))
+
+    # stage 2
+    BuildStage32N8(factory, 2)
+
+    # stage 3
+    BuildStage32N8(factory, 3, False)
+
+    # Trail
+    BlobPost(factory)
+    Compare23(
+        factory,
+        )
+    yield BuilderConfig(
+        name="clang-3stage-i686-linux",
+        category="Linux",
+        slavenames=["centos6"],
+        mergeRequests=True,
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -964,9 +1232,16 @@ def get_builders():
                    '/var/cache/llvm-project.git')
 
     BlobPre(factory)
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build"),
+                WithProperties("%(workdir)s/install"),
+                ],
+            flunkOnFailure=False))
 
     PatchLLVMClang(factory, "llvmclang.diff")
-    CheckMakefile(factory)
+    #CheckMakefile(factory)
     factory.addStep(ShellCommand(
             command=[
                 WithProperties("%(workdir)s/llvm-project/llvm/configure"),
@@ -976,15 +1251,15 @@ def get_builders():
                 WithProperties("--prefix=%(workdir)s/install"),
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "--target=i686-pc-cygwin",
+                "--enable-cxx11",
                 "--enable-optimized",
                 "--enable-targets=x86",
                 "--disable-timestamps",
-                "--with-optimize-option=-O2",
                 ],
             name="configure",
             description="configuring",
             descriptionDone="Configure",
-            doStepIf=Makefile_not_ready,
+            #doStepIf=Makefile_not_ready,
             ))
     factory.addStep(ShellCommand(command=["sh", "-c",
                                           "./config.status --recheck"],
@@ -1003,6 +1278,7 @@ def get_builders():
                 "RANLIB=echo",
                 "-k",
                 "-j8",
+                #"-l8.2",
                 ],
             ))
     factory.addStep(LitTestCommand(
@@ -1026,7 +1302,7 @@ def get_builders():
 
     yield BuilderConfig(
         name="clang-i686-cygwin-RA-centos6",
-        category="Linux",
+        category="Linux cross",
         slavenames=["centos6"],
         mergeRequests=True,
         env={
@@ -1064,6 +1340,7 @@ def get_builders():
                 WithProperties("--prefix=%(workdir)s/builds/install/stage1"),
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
                 "LIBS=-static",
+                "--enable-cxx11",
                 "--disable-timestamps",
                 "--enable-targets=x86",
                 #"--enable-shared",
@@ -1419,6 +1696,7 @@ def get_builders():
     yield BuilderConfig(
         name="ninja-clang-x64-mingw64-RA",
         category="Windows",
+        locks=[win7_cyg_glock.access('counting')],
         mergeRequests=True,
         slavenames=["win7"],
         env={
@@ -1520,7 +1798,7 @@ def get_builders():
             command=[ninja],
             #locks = [win7_cyg_lock.access('exclusive')],
             ))
-    BlobAdd(factory, ["build/*"])
+    #BlobAdd(factory, ["build/*"])
     factory.addStep(Compile(
             command=[ninja, "install"],
             #locks = [win7_cyg_lock.access('exclusive')],
@@ -1530,6 +1808,7 @@ def get_builders():
     yield BuilderConfig(
         name="ninja-clang-i686-msc17-R",
         category="Windows",
+        locks=[win7_cyg_glock.access('counting')],
         mergeRequests=True,
         slavenames=["win7"],
         env={
@@ -1576,6 +1855,7 @@ def get_builders():
             name="build_llvm_tblgen",
             timeout=3600,
             workdir=wd,
+            locks = [win7_cyg_lock.access('exclusive')],
             command=[
                 msbuild,
                 "-m:4",
@@ -1613,7 +1893,10 @@ def get_builders():
     factory.addStep(Compile(
             name="build_llvm",
             timeout=3600,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('exclusive'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             workdir=wd,
             command=[
                 msbuild,
@@ -1630,13 +1913,14 @@ def get_builders():
             ])
     AddLitDOS(factory, "llvm", "test",
               lit="../../llvm-project/llvm/utils/lit/lit.py",
+              glock=True,
               workdir=wd,
               build_mode='Debug')
     BlobAdd(factory, [wd+"/test"])
     factory.addStep(Compile(
             name="build_llvm_all",
             timeout=3600,
-            #locks = [win7_cyg_lock.access('exclusive')],
+            locks = [win7_cyg_lock.access('exclusive')],
             workdir=wd,
             command=[
                 msbuild,
@@ -1648,7 +1932,7 @@ def get_builders():
     factory.addStep(Compile(
             name="install_llvm",
             timeout=3600,
-            #locks = [win7_cyg_lock.access('exclusive')],
+            locks = [win7_cyg_lock.access('exclusive')],
             workdir=wd,
             command=[
                 msbuild,
@@ -1663,6 +1947,7 @@ def get_builders():
             name="build_clang_tblgen",
             timeout=3600,
             workdir=wd,
+            locks = [win7_cyg_lock.access('exclusive')],
             command=[
                 msbuild,
                 "-m:4",
@@ -1702,7 +1987,10 @@ def get_builders():
     factory.addStep(Compile(
             name="build_clang_tools",
             timeout=3600,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('exclusive'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             workdir=wd,
             command=[
                 msbuild,
@@ -1714,7 +2002,6 @@ def get_builders():
     AddLitDOS(factory, "clang-tools", "tools/extra/test",
               lit="../../llvm-project/llvm/utils/lit/lit.py",
               workdir=wd,
-              lock=False,
               build_mode='Debug')
     BlobAdd(factory, [
             wd+"/tools/extra",
@@ -1740,12 +2027,13 @@ def get_builders():
     AddLitDOS(factory, "clang", "test",
               lit="../../llvm-project/llvm/utils/lit/lit.py",
               workdir=wd,
+              glock=True,
               build_mode='Debug')
     BlobAdd(factory, [wd+"/test"])
     factory.addStep(Compile(
             name="build_clang_all",
             timeout=3600,
-            #locks = [win7_cyg_lock.access('exclusive')],
+            locks = [win7_cyg_lock.access('exclusive')],
             workdir=wd,
             command=[
                 msbuild,
@@ -1757,7 +2045,7 @@ def get_builders():
     factory.addStep(Compile(
             name="install_clang",
             timeout=3600,
-            #locks = [win7_cyg_lock.access('exclusive')],
+            locks = [win7_cyg_lock.access('exclusive')],
             workdir=wd,
             command=[
                 msbuild,

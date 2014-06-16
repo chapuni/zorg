@@ -90,7 +90,8 @@ def get_schedulers():
     llvm_linux = AnyBranchScheduler(
         name="s_cmake-llvm-x86_64-linux",
         change_filter = change_llvm_master,
-        treeStableTimer=None,
+        #treeStableTimer=None,
+        treeStableTimer=2,
         builderNames=[
             "cmake-llvm-x86_64-linux",
             ])
@@ -130,16 +131,25 @@ def get_schedulers():
             ])
     yield cyg_centos6
 
+    x64_centos6 = AnyBranchScheduler(
+        name="s_ninja-x64-msvc-RA-centos6",
+        change_filter = change_cmake_llvmclang,
+        treeStableTimer=10,
+        upstreams=[llvm_linux, clang_linux, tools_linux,cyg_centos6],
+        builderNames=[
+            "ninja-x64-msvc-RA-centos6",
+            ])
+    yield x64_centos6
+
     llvmclang_mingw64 = AnyBranchScheduler(
         name="s_cmake-clang-x64-mingw64",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=1 * 60,
-        upstreams=[cyg_centos6, llvm_linux, clang_linux, tools_linux],
+        upstreams=[cyg_centos6, x64_centos6, llvm_linux, clang_linux, tools_linux],
         builderNames=[
             "ninja-clang-x64-mingw64-RA",
             ])
     yield llvmclang_mingw64
-
 
     llvmclang_msc17 = AnyBranchScheduler(
         name="s_ninja-clang-i686-msc17-R",
@@ -155,7 +165,7 @@ def get_schedulers():
         name="s_msbuild-llvmclang-x64-msc17-DA",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=30 * 60,
-        upstreams=[llvmclang_msc17,llvmclang_mingw64],
+        upstreams=[llvmclang_msc17,llvmclang_mingw64,x64_centos6],
         builderNames=[
             "msbuild-llvmclang-x64-msc17-DA",
             ])
@@ -175,11 +185,21 @@ def get_schedulers():
         name="s_clang-3stage-x86_64-linux",
         change_filter = change_llvmclang,
         treeStableTimer=15 * 60,
-        upstreams=[llvm_linux, clang_linux],
+        upstreams=[llvm_linux, clang_linux,cyg_centos6],
         builderNames=[
             "clang-3stage-x86_64-linux",
             ])
     yield clang_3stage_linux
+
+    clang_3stage_i686_linux = AnyBranchScheduler(
+        name="s_clang-3stage-i686-linux",
+        change_filter = change_llvmclang,
+        treeStableTimer=20 * 60,
+        upstreams=[llvm_linux, clang_linux,cyg_centos6,clang_3stage_linux],
+        builderNames=[
+            "clang-3stage-i686-linux",
+            ])
+    yield clang_3stage_i686_linux
 
     # yield AnyBranchScheduler(
     #     name="s_clang-i686-msys",
@@ -195,11 +215,12 @@ def get_schedulers():
     yield AnyBranchScheduler(
         name="s_clang-3stage-i686-cygwin",
         change_filter = change_autoconf_llvmclang,
-        treeStableTimer=45 * 60,
+        treeStableTimer=30 * 60,
         upstreams=[
             cyg_centos6,
             llvmclang_mingw64,
             clang_3stage_linux,
+            clang_3stage_i686_linux,
             ],
         builderNames=[
             "clang-3stage-i686-cygwin",
@@ -210,6 +231,8 @@ def get_schedulers():
         builderNames=[
             "cmake-clang-x86_64-linux",
             "cmake-clang-tools-x86_64-linux",
+            "ninja-x64-msvc-RA-centos6",
+            "clang-3stage-i686-linux",
 #            "cmake-clang-i686-mingw32",
             "ninja-clang-x64-mingw64-RA",
             "ninja-clang-i686-msc17-R",
