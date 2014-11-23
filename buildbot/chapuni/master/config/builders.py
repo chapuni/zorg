@@ -783,6 +783,17 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
+    factory.addStep(ShellCommand(
+            name="blob-fetch",
+            description="Syncing blob",
+            descriptionDone="Synced blob",
+            command=[
+                "sh", "-c",
+                WithProperties("../blob.pl fetch=cmake-llvm-x86_64-linux got_revision=%(got_revision)s ref=/var/cache/llvm-project.git"),
+                ],
+            flunkOnFailure=False,
+            timeout=3600,
+            workdir="."))
     AddCleanBin(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -826,7 +837,8 @@ def get_builders():
         name="cmake-clang-x86_64-linux",
         category="Linux fast",
         slavenames=["centos6"],
-        mergeRequests=False,
+        #mergeRequests=False,
+        mergeRequests=True,
         env={
             'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
@@ -842,6 +854,17 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
+    factory.addStep(ShellCommand(
+            name="blob-fetch",
+            description="Syncing blob",
+            descriptionDone="Synced blob",
+            command=[
+                "sh", "-c",
+                WithProperties("../blob.pl fetch=cmake-clang-x86_64-linux got_revision=%(got_revision)s ref=/var/cache/llvm-project.git"),
+                ],
+            flunkOnFailure=False,
+            timeout=3600,
+            workdir="."))
     AddCleanBin(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -858,21 +881,21 @@ def get_builders():
         CLANG_BUILD_EXAMPLES="ON",
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
-            name            = 'build_clang',
+            name            = 'build_clang_tools',
             locks           = [centos6_lock.access('counting')],
             command         = ["ninja", "check-clang-tools"],
             description     = ["building", "clang-tools"],
             descriptionDone = ["built",    "clang-tools"]))
     factory.addStep(LitTestCommand(
-            name            = 'test_clang',
+            name            = 'test_clang_tools',
             #locks           = [centos6_lock.access('counting')],
             command         = [
                 "bin/llvm-lit",
                 "-v",
                 "tools/clang/tools/extra/test",
                 ],
-            description     = ["testing", "clang"],
-            descriptionDone = ["test",    "clang"],
+            description     = ["testing", "clang-tools"],
+            descriptionDone = ["test",    "clang-tools"],
             timeout=60,
             ))
     # factory.addStep(Compile(
@@ -887,7 +910,89 @@ def get_builders():
         name="cmake-clang-tools-x86_64-linux",
         category="Linux fast",
         slavenames=["centos6"],
-        mergeRequests=False,
+        #mergeRequests=False,
+        mergeRequests=True,
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
+    # dragonegg
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+    BlobPre(factory)
+    AddCleanBin(factory)
+
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeCentOS6Ninja(
+        factory,
+        buildClang=False,
+        LLVM_TARGETS_TO_BUILD="X86",
+        LLVM_ENABLE_ASSERTIONS="ON",
+        BUILD_SHARED_LIBS="ON",
+        LLVM_BUILD_EXAMPLES="OFF",
+        LLVM_BUILD_RUNTIME="OFF",
+        LLVM_BUILD_TESTS="OFF",
+        LLVM_BUILD_TOOLS="OFF",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_EXTERNAL_DRAGONEGG_SOURCE_DIR="../llvm-project/dragonegg",
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name            = 'build_dragonegg',
+            locks           = [centos6_lock.access('counting')],
+            command         = ["ninja", "check-dragonegg-validator"],
+            description     = ["building", "dragonegg"],
+            descriptionDone = ["built",    "dragonegg"]))
+    factory.addStep(LitTestCommand(
+            name            = 'test_validator',
+            #locks           = [centos6_lock.access('counting')],
+            command         = [
+                "../llvm-project/llvm/utils/lit/lit.py",
+                "-v",
+                "--param",  "site=projects/dragonegg/test/dragonegg-lit.site.cfg",
+                "--config-prefix=validator-lit",
+                "../llvm-project/dragonegg/test/validator",
+                ],
+            description     = ["testing", "validator"],
+            descriptionDone = ["test",    "validator"],
+            timeout=60,
+            ))
+    factory.addStep(LitTestCommand(
+            name            = 'test_compilator',
+            locks           = [centos6_lock.access('counting')],
+            command         = [
+                "../llvm-project/llvm/utils/lit/lit.py",
+                "-v",
+                "--param",  "site=projects/dragonegg/test/dragonegg-lit.site.cfg",
+                "--config-prefix=compilator-lit",
+                "../llvm-project/dragonegg/test/compilator",
+                ],
+            description     = ["testing", "compilator"],
+            descriptionDone = ["test",    "compilator"],
+            timeout=60,
+            ))
+    factory.addStep(Compile(
+            #locks           = [centos6_lock.access('counting')],
+            name            = 'install',
+            command         = ["ninja", "install"],
+            description     = ["installing", "all"],
+            descriptionDone = ["installed",    "all"],
+            ))
+
+    BlobPost(factory)
+    yield BuilderConfig(
+        name="cmake-dragonegg-x86_64-linux",
+        category="Linux fast",
+        slavenames=["centos6"],
+        #mergeRequests=False,
+        mergeRequests=True,
         env={
             'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
@@ -950,7 +1055,8 @@ def get_builders():
         name="ninja-x64-msvc-RA-centos6",
         category="Linux cross",
         slavenames=["centos6"],
-        mergeRequests=False,
+        #mergeRequests=False,
+        mergeRequests=True,
         env={
             'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
@@ -1036,7 +1142,7 @@ def get_builders():
                     LLVM_BUILD_EXAMPLES="ON",
                     CLANG_BUILD_EXAMPLES="ON",
                     BUILD_SHARED_LIBS="ON",
-                    LLVM_EXTERNAL_DRAGONEGG_SOURCE_DIR="../llvm-project/dragonegg",
+                    __CMAKE_EXE_LINKER_FLAGS=WithProperties("-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,%(workdir)s/build/lib"),
                     prefix="builds/install/stage1")
     factory.addStep(Compile(
             name="stage1_build",
@@ -1055,21 +1161,6 @@ def get_builders():
             command         = ["make", "-j8", "-k", "check-clang"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"],
-            locks=[centos6_lock.access('counting')],
-            timeout=60,
-            ))
-    factory.addStep(LitTestCommand(
-            name            = 'stage1_test_validator',
-            command         = ["make", "-j8", "-k", "check-dragonegg-validator"],
-            description     = ["testing", "validator"],
-            descriptionDone = ["test",    "validator"],
-            timeout=60,
-            ))
-    factory.addStep(LitTestCommand(
-            name            = 'stage1_test_compilator',
-            command         = ["make", "-j8", "-k", "check-dragonegg-compilator"],
-            description     = ["testing", "compilator"],
-            descriptionDone = ["test",    "compilator"],
             locks=[centos6_lock.access('counting')],
             timeout=60,
             ))
@@ -1652,6 +1743,7 @@ def get_builders():
     AddCMakeDOS(
         factory, "Ninja",
         CMAKE_BUILD_TYPE="Release",
+        BUILD_SHARED_LIBS="ON",
         LLVM_ENABLE_ASSERTIONS="ON",
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
@@ -1738,7 +1830,7 @@ def get_builders():
     factory.addStep(Compile(
             name            = 'build_clang_tools',
             #locks = [win7_cyg_lock.access('exclusive')],
-            command         = [ninja, "check-clang-tools"],
+            command         = [ninja, "-k64", "check-clang-tools"],
             description     = ["building", "tools"],
             descriptionDone = ["built",    "tools"]))
     AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
@@ -1756,7 +1848,7 @@ def get_builders():
             descriptionDone = ["built",    "llvm"]))
     factory.addStep(Compile(
             name            = 'build_llvm',
-            command         = [ninja, "check-llvm"],
+            command         = [ninja, "-k64", "check-llvm"],
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
     BlobAdd(factory, [
@@ -1780,7 +1872,7 @@ def get_builders():
             name            = 'build_clang',
             haltOnFailure = False,
             flunkOnFailure=False,
-            command         = [ninja, "check-clang"],
+            command         = [ninja, "-k64", "check-clang"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
     BlobAdd(factory, [
