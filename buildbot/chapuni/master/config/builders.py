@@ -163,7 +163,6 @@ def AddCMake(factory, G,
 
     cmd = ["cmake", "-G"+G]
     cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
-    cmd.append("-DLLVM_ENABLE_CXX11=ON")
     cmd.append("-DLLVM_BUILD_TESTS=ON")
     if buildClang:
         cmd.append("-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%s/../clang" % source)
@@ -208,6 +207,7 @@ def AddCMakeCentOS6(factory,
         CMAKE_BUILD_TYPE="Release",
         LLVM_ENABLE_TIMESTAMPS="OFF",
         CMAKE_CXX_CREATE_STATIC_LIBRARY="<CMAKE_COMMAND> -E remove <TARGET>;<CMAKE_AR> crsD <TARGET> <LINK_FLAGS> <OBJECTS>",
+        PYTHON_EXECUTABLE="/usr/bin/python3",
         LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
@@ -225,6 +225,7 @@ def AddCMakeCentOS6Ninja(factory,
         CMAKE_CXX_COMPILER=CMAKE_CXX_COMPILER,
         LLVM_ENABLE_TIMESTAMPS="OFF",
         CMAKE_CXX_CREATE_STATIC_LIBRARY="<CMAKE_COMMAND> -E remove <TARGET>;<CMAKE_AR> crsD <TARGET> <LINK_FLAGS> <OBJECTS>",
+        PYTHON_EXECUTABLE="/usr/bin/python3",
         LLVM_TARGETS_TO_BUILD=LLVM_TARGETS_TO_BUILD,
         LLVM_LIT_ARGS=LLVM_LIT_ARGS,
         **kwargs)
@@ -346,6 +347,7 @@ def BuildStageN8(factory, n,
                 WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
                 WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "--with-python=/usr/bin/python3",
                 "--disable-timestamps",
                 "--disable-assertions",
                 "--enable-cxx11",
@@ -359,7 +361,6 @@ def BuildStageN8(factory, n,
             name="build",
             command=[
                 "make",
-                "VERBOSE=1",
                 "-k",
                 "-j8", "-l8.2",
                 "AR.Flags=crsD",
@@ -381,12 +382,93 @@ def BuildStageN8(factory, n,
             name="install",
             command=[
                 "make",
-                "VERBOSE=1",
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 "install",
                 "-j8"],
             workdir=workdir))
+    factory.addStep(ShellCommand(
+            name="install_fix",
+            command=[
+                "mv", "-v",
+                tmpinst,
+                "%s/stage%d" % (instroot, n)],
+            workdir="."))
+    factory.addStep(ShellCommand(
+            name="builddir_fix",
+            command=[
+                "mv", "-v",
+                workdir,
+                "%s/stage%d" % (root, n)],
+            workdir="."))
+
+def BuildStageNCMake(factory, n,
+                 warn = True,
+                 root="builds"):
+    instroot="%s/install" % root
+    workdir="%s/stagen" % root
+    tools="%s/stage%d/bin" % (instroot, n - 1)
+    tmpinst="%s/stagen" % instroot
+    AddCMake(
+        factory, "Ninja",
+        source="../../llvm-project/llvm",
+        CMAKE_BUILD_TYPE="Release",
+        LLVM_ENABLE_ASSERTIONS="OFF",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        __CMAKE_C_COMPILER=WithProperties("-DCMAKE_C_COMPILER=%%(workdir)s/%s/clang" % tools),
+        __CMAKE_CXX_COMPILER=WithProperties("-DCMAKE_CXX_COMPILER=%%(workdir)s/%s/clang++" % tools),
+        __CMAKE_AR=WithProperties("-DCMAKE_AR=%%(workdir)s/%s/llvm-ar" % tools),
+        __CMAKE_RANLIB=WithProperties("-DCMAKE_RANLIB=%%(workdir)s/%s/llvm-ranlib" % tools),
+        #__CMAKE_CXX_CREATE_STATIC_LIBRARY=WithProperties("CMAKE_CXX_CREATE_STATIC_LIBRARY='<CMAKE_COMMAND> -E remove <TARGET>;%%(workdir)s/%s/llvm-ar rcs <TARGET> <OBJECTS>'" % tools),
+        CMAKE_C_FLAGS  ="-flto -fuse-ld=gold -Wdocumentation",
+        CMAKE_CXX_FLAGS="-flto -fuse-ld=gold -Wdocumentation",
+        CMAKE_EXE_LINKER_FLAGS   ="-flto -fuse-ld=gold",
+        CMAKE_MODULE_LINKER_FLAGS="-flto -fuse-ld=gold",
+        CMAKE_SHARED_LINKER_FLAGS="-flto -fuse-ld=gold",
+        LLVM_BINUTILS_INCDIR="/usr/include",
+        PYTHON_EXECUTABLE="/usr/bin/python3",
+
+        LLVM_ENABLE_TIMESTAMPS="OFF",
+        LLVM_TARGETS_TO_BUILD="all",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        prefix="builds/install/stagen",
+        workdir=workdir)
+
+    factory.addStep(Compile(
+            name            = 'build_llvmclang',
+            command         = ["ninja", "-l10", "check-all"],
+            description     = ["building", "llvmclang"],
+            descriptionDone = ["built",    "llvmclang"],
+            warnOnWarnings = warn,
+            timeout=3600,
+            workdir=workdir))
+
+    if n != 3:
+        factory.addStep(LitTestCommand(
+                name            = 'test_all',
+                locks           = [centos6_lock.access('counting')],
+                command         = [
+                    "bin/llvm-lit",
+                    "-v",
+                    "test",
+                    "tools/clang/test",
+                    ],
+                description     = ["testing", "all"],
+                descriptionDone = ["test",    "all"],
+                timeout=60,
+                warnOnFailure=True,
+                workdir=workdir,
+                ))
+
+    factory.addStep(Compile(
+            name            = 'install',
+            command         = ["ninja", "install"],
+            description     = ["installing", "llvmclang"],
+            descriptionDone = ["installed",    "llvmclang"],
+            timeout=3600,
+            workdir=workdir))
+
     factory.addStep(ShellCommand(
             name="install_fix",
             command=[
@@ -416,6 +498,7 @@ def BuildStage32N8(factory, n,
                 WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
                 WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "--with-python=/usr/bin/python3",
                 "--disable-timestamps",
                 "--disable-assertions",
                 "--enable-cxx11",
@@ -430,7 +513,6 @@ def BuildStage32N8(factory, n,
             name="build",
             command=[
                 "make",
-                "VERBOSE=1",
                 "-k",
                 "-j8", "-l8.2",
                 "AR.Flags=crsD",
@@ -444,6 +526,7 @@ def BuildStage32N8(factory, n,
                 name="test_llvmclang",
                 command=["make", "LIT_ARGS=-v -j8", "check-all"],
                 timeout=60,
+                warnOnFailure=True,
                 locks=[centos6_lock.access('counting')],
                 workdir=workdir,
                 ))
@@ -452,7 +535,6 @@ def BuildStage32N8(factory, n,
             name="install",
             command=[
                 "make",
-                "VERBOSE=1",
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 "install",
@@ -509,7 +591,6 @@ def BuildStageNcyg(
                 ],
             command=[
                 "make",
-                "VERBOSE=1",
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 "-k",
@@ -522,7 +603,6 @@ def BuildStageNcyg(
             flunkOnFailure=False,
             command=[
                 "make",
-                "VERBOSE=1",
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 "-k",
@@ -531,7 +611,6 @@ def BuildStageNcyg(
     factory.addStep(Compile(
             command=[
                 "make",
-                "VERBOSE=1",
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 "-k",
@@ -555,7 +634,6 @@ def BuildStageNcyg(
             name="install",
             command=[
                 "make",
-                "VERBOSE=1",
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 "install",
@@ -747,7 +825,7 @@ def get_builders():
         mergeRequests=True,
         #locks=[centos6_lock.access('counting')],
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -840,7 +918,7 @@ def get_builders():
         #mergeRequests=False,
         mergeRequests=True,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -913,7 +991,7 @@ def get_builders():
         #mergeRequests=False,
         mergeRequests=True,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -987,20 +1065,20 @@ def get_builders():
             ))
 
     BlobPost(factory)
-    yield BuilderConfig(
-        name="cmake-dragonegg-x86_64-linux",
-        category="Linux fast",
-        slavenames=["centos6"],
-        #mergeRequests=False,
-        mergeRequests=True,
-        env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
-            'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="cmake-dragonegg-x86_64-linux",
+    #     category="Linux fast",
+    #     slavenames=["centos6"],
+    #     #mergeRequests=False,
+    #     mergeRequests=True,
+    #     env={
+    #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # MS target on CentOS6
     factory = BuildFactory()
@@ -1058,7 +1136,7 @@ def get_builders():
         #mergeRequests=False,
         mergeRequests=True,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -1143,6 +1221,7 @@ def get_builders():
                     CLANG_BUILD_EXAMPLES="ON",
                     BUILD_SHARED_LIBS="ON",
                     __CMAKE_EXE_LINKER_FLAGS=WithProperties("-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,%(workdir)s/build/lib"),
+                    LLVM_BINUTILS_INCDIR="/usr/include",
                     prefix="builds/install/stage1")
     factory.addStep(Compile(
             name="stage1_build",
@@ -1154,6 +1233,7 @@ def get_builders():
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"],
             locks=[centos6_lock.access('counting')],
+            warnOnFailure=True,
             timeout=60,
             ))
     factory.addStep(LitTestCommand(
@@ -1161,17 +1241,26 @@ def get_builders():
             command         = ["make", "-j8", "-k", "check-clang"],
             description     = ["testing", "clang"],
             descriptionDone = ["test",    "clang"],
+            warnOnFailure=True,
             locks=[centos6_lock.access('counting')],
             timeout=60,
             ))
     factory.addStep(Compile(name="stage1_install",
                             command=["make", "install", "-k", "-j8"]))
 
+    factory.addStep(ShellCommand(
+            command=[
+                "ln", "-svf",
+                WithProperties("%(workdir)s/builds/install/stage1/bin/llvm-ar"),
+                WithProperties("%(workdir)s/builds/install/stage1/bin/llvm-ranlib"),
+                ],
+            flunkOnFailure=False))
+
     # stage 2
-    BuildStageN8(factory, 2)
+    BuildStageNCMake(factory, 2)
 
     # stage 3
-    BuildStageN8(factory, 3, False)
+    BuildStageNCMake(factory, 3, False)
 
     # Trail
     BlobPost(factory)
@@ -1184,6 +1273,7 @@ def get_builders():
     #                              workdir="."))
     Compare23(
         factory,
+        warn=False,
         )
     yield BuilderConfig(
         name="clang-3stage-x86_64-linux",
@@ -1191,7 +1281,7 @@ def get_builders():
         slavenames=["centos6"],
         mergeRequests=True,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -1218,6 +1308,7 @@ def get_builders():
                 "CC=/home/bb/bin/gcc47",
                 "CXX=/home/bb/bin/g++47",
                 WithProperties("--prefix=%(workdir)s/builds/install/stage1-llvm"),
+                "--with-python=/usr/bin/python3",
                 "--enable-cxx11",
                 "--enable-optimized",
                 "--enable-targets=x86",
@@ -1245,13 +1336,13 @@ def get_builders():
             locks=[centos6_lock.access('counting')],
             command=["make", "LIT_ARGS=-v -j8", "check"],
             timeout=60,
+            warnOnFailure=True,
             workdir=wd,
             ))
     factory.addStep(Compile(
             name="install",
             command=[
                 "make",
-                "VERBOSE=1",
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 "install",
@@ -1283,6 +1374,7 @@ def get_builders():
             descriptionDone = ["test",    "clang"],
             locks=[centos6_lock.access('counting')],
             timeout=60,
+            warnOnFailure=True,
             workdir=wd,
             ))
     factory.addStep(Compile(
@@ -1308,7 +1400,7 @@ def get_builders():
         slavenames=["centos6"],
         mergeRequests=True,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -1341,6 +1433,7 @@ def get_builders():
                 "CXX=/home/bb/bin/g++47",
                 WithProperties("--prefix=%(workdir)s/install"),
                 WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "--with-python=/usr/bin/python3",
                 "--target=i686-pc-cygwin",
                 "--enable-cxx11",
                 "--enable-optimized",
@@ -1382,7 +1475,6 @@ def get_builders():
             name="install",
             command=[
                 "make",
-                "VERBOSE=1",
                 "AR.Flags=crsD",
                 "RANLIB=echo",
                 "install",
@@ -1913,6 +2005,366 @@ def get_builders():
             },
         factory=factory)
 
+    # ninja-msc18
+    ninja = "C:/bb-win7/ninja.exe"
+    factory = BuildFactory()
+    AddGitWin7(factory)
+    BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeDOS(
+        factory, "Ninja",
+        CMAKE_MAKE_PROGRAM=ninja,
+        CMAKE_BUILD_TYPE="Release",
+        LLVM_ENABLE_ASSERTIONS="OFF",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        CMAKE_C_COMPILER="C:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/bin/cl.exe",
+        CMAKE_CXX_COMPILER="C:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/bin/cl.exe",
+        doStepIf=Makefile_not_ready)
+
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-clang-tools"],
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            command         = [ninja, "-k64", "check-clang-tools"],
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
+    AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
+    BlobAdd(factory, [
+            "build/tools/clang",
+            ])
+
+    factory.addStep(Compile(
+            name            = 'build_llvm',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-llvm"],
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            description     = ["building", "llvm"],
+            descriptionDone = ["built",    "llvm"]))
+    factory.addStep(Compile(
+            name            = 'build_llvm',
+            command         = [ninja, "-k64", "check-llvm"],
+            description     = ["building", "llvm"],
+            descriptionDone = ["built",    "llvm"]))
+    BlobAdd(factory, [
+            "build/bin",
+            "build/include",
+            "build/lib",
+            "build/tools",
+            "build/unittests",
+            "build/utils",
+            ])
+    AddLitDOS(factory, "llvm", "test")
+    BlobAdd(factory, ["build/test"])
+
+    factory.addStep(Compile(
+            name            = 'build_clang',
+            locks = [win7_cyg_lock.access('exclusive')],
+            command         = [ninja, "check-clang"],
+            description     = ["building", "clang"],
+            descriptionDone = ["built",    "clang"]))
+    factory.addStep(Compile(
+            name            = 'build_clang',
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            command         = [ninja, "-k64", "check-clang"],
+            description     = ["building", "clang"],
+            descriptionDone = ["built",    "clang"]))
+    BlobAdd(factory, [
+            "build/bin",
+            "build/lib",
+            "build/tools/clang/include",
+            "build/tools/clang/lib",
+            "build/tools/clang/tools",
+            "build/tools/clang/unittests",
+            ])
+    AddLitDOS(factory, "clang", "tools/clang/test")
+    BlobAdd(factory, ["build/tools/clang"])
+
+    factory.addStep(Compile(
+            command=[ninja],
+            ))
+    factory.addStep(Compile(
+            command=[ninja, "install"],
+            ))
+
+    BlobPost(factory)
+    yield BuilderConfig(
+        name="ninja-clang-i686-msc18-R",
+        category="Windows",
+        locks=[win7_cyg_glock.access('counting')],
+        mergeRequests=True,
+        slavenames=["win7"],
+        env={
+            'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\8.1\include\shared;C:\Program Files (x86)\Windows Kits\8.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\winrt',
+            'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
+            'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\Microsoft SDKs\F#\3.1\Framework\v4.0\;C:\Program Files (x86)\MSBuild\12.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Windows\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools;${PATH};C:\bb-win7',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
+    # msc18 x64
+    msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
+    factory = BuildFactory()
+    AddGitWin7(factory)
+    BlobPre(factory)
+    PatchLLVMClang(factory, "llvmclang.diff")
+
+    wd="builds/tblgen"
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 12 Win64",
+        source="../../llvm-project/llvm",
+        prefix="install/llvm",
+        #LLVM_TARGETS_TO_BUILD="X86",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Release"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Release",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_llvm_tblgen",
+            timeout=3600,
+            workdir=wd,
+            locks = [win7_cyg_lock.access('exclusive')],
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Release",
+                "utils/TableGen/llvm-tblgen.vcxproj"]))
+    BlobAdd(factory, [wd])
+
+    wd="builds/llvm"
+    factory.addStep(SetProperty(property="exists_Makefile", value=''))
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 12 Win64",
+        source="../../llvm-project/llvm",
+        prefix="install/llvm",
+        buildClang=False,
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Debug"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_llvm",
+            timeout=3600,
+            locks = [
+                win7_cyg_glock.access('exclusive'),
+                win7_cyg_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "test/check-llvm.vcxproj"]))
+    BlobAdd(factory, [
+            wd+"/Debug",
+            wd+"/include",
+            wd+"/lib",
+            wd+"/unittests",
+            wd+"/utils",
+            ])
+    AddLitDOS(factory, "llvm", "test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              glock=True,
+              workdir=wd,
+              build_mode='Debug')
+    BlobAdd(factory, [wd+"/test"])
+    factory.addStep(Compile(
+            name="build_llvm_all",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "LLVM.sln"]))
+    BlobAdd(factory, [wd])
+    factory.addStep(Compile(
+            name="install_llvm",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "INSTALL.vcxproj"]))
+    BlobAdd(factory, ["install/llvm"])
+
+    wd="builds/tblgen"
+    factory.addStep(Compile(
+            name="build_clang_tblgen",
+            timeout=3600,
+            workdir=wd,
+            locks = [win7_cyg_lock.access('exclusive')],
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Release",
+                "tools/clang/utils/TableGen/clang-tblgen.vcxproj"]))
+    BlobAdd(factory, [wd])
+
+    wd="builds/clang"
+    factory.addStep(SetProperty(property="exists_Makefile", value=''))
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 12 Win64",
+        source="../../llvm-project/clang",
+        prefix="install/clang",
+        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(workdir)s/install/llvm/bin/llvm-config.exe"),
+        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
+        CMAKE_CXX_FLAGS="/DWIN32 /D_WINDOWS /W3 /Zm1000 /bigobj /GR /EHsc",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Debug"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_clang_tools",
+            timeout=3600,
+            locks = [
+                win7_cyg_glock.access('exclusive'),
+                win7_cyg_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "tools/extra/test/check-clang-tools.vcxproj"]))
+
+    AddLitDOS(factory, "clang-tools", "tools/extra/test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              workdir=wd,
+              build_mode='Debug')
+    BlobAdd(factory, [
+            wd+"/tools/extra",
+            ])
+    factory.addStep(Compile(
+            name="build_clang",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "test/check-clang.vcxproj"]))
+    BlobAdd(factory, [
+            wd+"/Debug",
+            wd+"/include",
+            wd+"/lib",
+            wd+"/tools",
+            wd+"/unittests",
+            ])
+    AddLitDOS(factory, "clang", "test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              workdir=wd,
+              glock=True,
+              build_mode='Debug')
+    BlobAdd(factory, [wd+"/test"])
+    factory.addStep(Compile(
+            name="build_clang_all",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "Clang.sln"]))
+    BlobAdd(factory, [wd])
+    factory.addStep(Compile(
+            name="install_clang",
+            timeout=3600,
+            locks = [win7_cyg_lock.access('exclusive')],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:4",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "INSTALL.vcxproj"]))
+
+    BlobPost(factory)
+    yield BuilderConfig(
+        name="msbuild-llvmclang-x64-msc18-DA",
+        category="Windows",
+        mergeRequests=True,
+        slavenames=["win7"],
+        env={
+            'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\8.1\include\shared;C:\Program Files (x86)\Windows Kits\8.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\winrt',
+            'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB\amd64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB\amd64;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x64',
+            'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\12.0\bin\amd64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN\amd64;C:\Windows\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools\x64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x64;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools\x64\;${PATH};C:\bb-win7',
+            'VisualStudioVersion': '12.0',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
     # msc17 x64
     msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
     factory = BuildFactory()
@@ -2162,7 +2614,6 @@ def get_builders():
             'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
             },
         factory=factory)
-
 
     # msc16 x64
     msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
