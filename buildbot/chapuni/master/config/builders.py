@@ -622,12 +622,18 @@ def BuildStageNcyg(
         factory.addStep(LitTestCommand(
                 name="test_clang",
                 command=["make", "TESTARGS=--use-processes -v -j8", "-C", "tools/clang/test"],
-                locks = [win7_cyg_lock.access('exclusive')],
+                locks = [
+                    win7_cyg_glock.access('counting'),
+                    win7_cyg_lock.access('exclusive'),
+                    ],
                 workdir=workdir))
         factory.addStep(LitTestCommand(
                 name="test_llvm",
                 command=["make", "LIT_ARGS=--use-processes -v -j8", "check"],
-                locks = [win7_cyg_lock.access('exclusive')],
+                locks = [
+                    win7_cyg_glock.access('counting'),
+                    win7_cyg_lock.access('exclusive'),
+                    ],
                 workdir=workdir))
 
     factory.addStep(Compile(
@@ -790,6 +796,7 @@ def get_builders():
         factory, buildClang=False,
         LLVM_BUILD_EXAMPLES="ON",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_BINUTILS_INCDIR="/usr/include",
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
             name            = 'build_llvm',
@@ -861,17 +868,17 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
-    factory.addStep(ShellCommand(
-            name="blob-fetch",
-            description="Syncing blob",
-            descriptionDone="Synced blob",
-            command=[
-                "sh", "-c",
-                WithProperties("../blob.pl fetch=cmake-llvm-x86_64-linux got_revision=%(got_revision)s ref=/var/cache/llvm-project.git"),
-                ],
-            flunkOnFailure=False,
-            timeout=3600,
-            workdir="."))
+    # factory.addStep(ShellCommand(
+    #         name="blob-fetch",
+    #         description="Syncing blob",
+    #         descriptionDone="Synced blob",
+    #         command=[
+    #             "sh", "-c",
+    #             WithProperties("../blob.pl fetch=cmake-llvm-x86_64-linux got_revision=%(got_revision)s ref=/var/cache/llvm-project.git"),
+    #             ],
+    #         flunkOnFailure=False,
+    #         timeout=3600,
+    #         workdir="."))
     AddCleanBin(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -891,6 +898,9 @@ def get_builders():
             command         = ["ninja", "check-all"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
             locks           = [centos6_lock.access('counting')],
@@ -932,17 +942,17 @@ def get_builders():
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
     BlobPre(factory)
-    factory.addStep(ShellCommand(
-            name="blob-fetch",
-            description="Syncing blob",
-            descriptionDone="Synced blob",
-            command=[
-                "sh", "-c",
-                WithProperties("../blob.pl fetch=cmake-clang-x86_64-linux got_revision=%(got_revision)s ref=/var/cache/llvm-project.git"),
-                ],
-            flunkOnFailure=False,
-            timeout=3600,
-            workdir="."))
+    # factory.addStep(ShellCommand(
+    #         name="blob-fetch",
+    #         description="Syncing blob",
+    #         descriptionDone="Synced blob",
+    #         command=[
+    #             "sh", "-c",
+    #             WithProperties("../blob.pl fetch=cmake-clang-x86_64-linux got_revision=%(got_revision)s ref=/var/cache/llvm-project.git"),
+    #             ],
+    #         flunkOnFailure=False,
+    #         timeout=3600,
+    #         workdir="."))
     AddCleanBin(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -1107,6 +1117,9 @@ def get_builders():
             command         = ["ninja", "-l10", "check-all"],
             description     = ["building", "llvmclang"],
             descriptionDone = ["built",    "llvmclang"]))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'test_all',
             locks           = [centos6_lock.access('counting')],
@@ -1236,6 +1249,9 @@ def get_builders():
             warnOnFailure=True,
             timeout=60,
             ))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "-j8", "-k", "check-clang"],
@@ -1367,6 +1383,9 @@ def get_builders():
             command=["make", "-j8", "-l8.2", "-k"],
             workdir=wd,
             ))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/builds/stage1-clang/test/Modules"),
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "-j8", "-k", "check-all"],
@@ -1465,6 +1484,9 @@ def get_builders():
                 #"-l8.2",
                 ],
             ))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_llvmclang",
             locks=[centos6_lock.access('counting')],
@@ -1533,7 +1555,10 @@ def get_builders():
             name="stage1_build_quick",
             haltOnFailure = False,
             flunkOnFailure=False,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             command=[
                 "make",
                 "AR.Flags=crsD",
@@ -1560,18 +1585,24 @@ def get_builders():
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
             command         = ["make", "LIT_ARGS=--use-processes -v -j8", "check"],
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             flunkOnFailure  = False,
             warnOnWarnings = False,
             flunkOnWarnings = False,
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
-                                    flunkOnFailure=False))
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
             command         = ["make", "TESTARGS=--use-processes -v -j8", "-C", "tools/clang/test"],
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive')],
             flunkOnFailure  = False,
             warnOnWarnings = False,
             flunkOnWarnings = False,
@@ -1658,10 +1689,10 @@ def get_builders():
             timeout=2 * 60 * 60,
             ))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Analysis/Output"),
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Analysist"),
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
@@ -1862,6 +1893,9 @@ def get_builders():
             "build/tools/clang/unittests",
             ])
 
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
     AddLitDOS(factory, "clang", "tools/clang/test")
     BlobAdd(factory, ["build/tools/clang/test"])
 
@@ -1989,21 +2023,21 @@ def get_builders():
             ))
 
     BlobPost(factory)
-    yield BuilderConfig(
-        name="ninja-clang-i686-msc17-R",
-        category="Windows",
-        locks=[win7_cyg_glock.access('counting')],
-        mergeRequests=True,
-        slavenames=["win7"],
-        env={
-            'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
-            'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
-            'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};C:\bb-win7',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="ninja-clang-i686-msc17-R",
+    #     category="Windows",
+    #     locks=[win7_cyg_glock.access('counting')],
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
+    #         'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
+    #         'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};C:\bb-win7',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # ninja-msc18
     ninja = "C:/bb-win7/ninja.exe"
@@ -2088,11 +2122,16 @@ def get_builders():
             "build/tools/clang/tools",
             "build/tools/clang/unittests",
             ])
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
     AddLitDOS(factory, "clang", "tools/clang/test")
     BlobAdd(factory, ["build/tools/clang"])
 
     factory.addStep(Compile(
             command=[ninja],
+            haltOnFailure = False,
+            flunkOnFailure=False,
             ))
     factory.addStep(Compile(
             command=[ninja, "install"],
@@ -2149,7 +2188,10 @@ def get_builders():
             name="build_llvm_tblgen",
             timeout=3600,
             workdir=wd,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive')
+                ],
             command=[
                 msbuild,
                 "-m:4",
@@ -2214,7 +2256,10 @@ def get_builders():
     factory.addStep(Compile(
             name="build_llvm_all",
             timeout=3600,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             workdir=wd,
             command=[
                 msbuild,
@@ -2226,7 +2271,10 @@ def get_builders():
     factory.addStep(Compile(
             name="install_llvm",
             timeout=3600,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             workdir=wd,
             command=[
                 msbuild,
@@ -2241,7 +2289,10 @@ def get_builders():
             name="build_clang_tblgen",
             timeout=3600,
             workdir=wd,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             command=[
                 msbuild,
                 "-m:4",
@@ -2303,7 +2354,10 @@ def get_builders():
     factory.addStep(Compile(
             name="build_clang",
             timeout=3600,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             workdir=wd,
             command=[
                 msbuild,
@@ -2318,6 +2372,9 @@ def get_builders():
             wd+"/tools",
             wd+"/unittests",
             ])
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/builds/clang/test/Modules"),
+            flunkOnFailure=False))
     AddLitDOS(factory, "clang", "test",
               lit="../../llvm-project/llvm/utils/lit/lit.py",
               workdir=wd,
@@ -2327,7 +2384,10 @@ def get_builders():
     factory.addStep(Compile(
             name="build_clang_all",
             timeout=3600,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             workdir=wd,
             command=[
                 msbuild,
@@ -2339,7 +2399,10 @@ def get_builders():
     factory.addStep(Compile(
             name="install_clang",
             timeout=3600,
-            locks = [win7_cyg_lock.access('exclusive')],
+            locks = [
+                win7_cyg_glock.access('counting'),
+                win7_cyg_lock.access('exclusive'),
+                ],
             workdir=wd,
             command=[
                 msbuild,
@@ -2599,21 +2662,21 @@ def get_builders():
                 "INSTALL.vcxproj"]))
 
     BlobPost(factory)
-    yield BuilderConfig(
-        name="msbuild-llvmclang-x64-msc17-DA",
-        category="Windows",
-        mergeRequests=True,
-        slavenames=["win7"],
-        env={
-            'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
-            'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
-            'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};C:\bb-win7',
-            'VisualStudioVersion': '11.0',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="msbuild-llvmclang-x64-msc17-DA",
+    #     category="Windows",
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
+    #         'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
+    #         'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};C:\bb-win7',
+    #         'VisualStudioVersion': '11.0',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # msc16 x64
     msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
