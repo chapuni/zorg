@@ -623,7 +623,8 @@ def BuildStageNcyg(
                 name="test_clang",
                 command=["make", "TESTARGS=--use-processes -v -j8", "-C", "tools/clang/test"],
                 locks = [
-                    win7_cyg_glock.access('counting'),
+                    win7_cyg_glock.access('exclusive'),
+                    #win7_cyg_glock.access('counting'),
                     win7_cyg_lock.access('exclusive'),
                     ],
                 workdir=workdir))
@@ -631,7 +632,8 @@ def BuildStageNcyg(
                 name="test_llvm",
                 command=["make", "LIT_ARGS=--use-processes -v -j8", "check"],
                 locks = [
-                    win7_cyg_glock.access('counting'),
+                    win7_cyg_glock.access('exclusive'),
+                    #win7_cyg_glock.access('counting'),
                     win7_cyg_lock.access('exclusive'),
                     ],
                 workdir=workdir))
@@ -1157,6 +1159,78 @@ def get_builders():
             },
         factory=factory)
 
+    # i686-mingw32 on linux
+    factory = BuildFactory()
+    AddGitLLVMTree(factory,
+                   '/var/cache/llvm-project-tree.git',
+                   '/var/cache/llvm-project.git')
+    BlobPre(factory)
+
+    PatchLLVMClang(factory, "llvmclang.diff")
+    wd="builds/tblgen"
+    #CheckMakefile(factory, makefile="build.ninja", workdir=wd)
+    AddCMakeCentOS6Ninja(
+        factory,
+        source="../../llvm-project/llvm",
+        LLVM_ENABLE_ASSERTIONS="ON",
+        workdir=wd,
+        #doStepIf=Makefile_not_ready
+        )
+    factory.addStep(Compile(
+            name="build_tblgen",
+            workdir=wd,
+            command         = ["ninja","llvm-tblgen","clang-tblgen"],
+            description     = ["building", "tblgen"],
+            descriptionDone = ["built",    "tblgen"]))
+    tblgen=wd
+
+    wd="builds/i686-mingw32"
+    CheckMakefile(factory, makefile="build.ninja", workdir=wd)
+    AddCMakeCentOS6Ninja(
+        factory,
+        source="../../llvm-project/llvm",
+        prefix="builds/install",
+        LLVM_ENABLE_ASSERTIONS="ON",
+        BUILD_SHARED_LIBS="ON",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/"+tblgen+"/bin/llvm-tblgen"),
+        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/"+tblgen+"/bin/clang-tblgen"),
+        CMAKE_TOOLCHAIN_FILE="/usr/share/mingw/toolchain-mingw32.cmake",
+        CMAKE_C_COMPILER="i686-w64-mingw32-gcc",
+        CMAKE_CXX_COMPILER="i686-w64-mingw32-g++",
+        __CROSS_TOOLCHAIN_FLAGS_NATIVE=WithProperties("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=-DCMAKE_C_COMPILER=/home/bb/bin/gcc47;-DCMAKE_CXX_COMPILER=/home/bb/bin/g++47;-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%(workdir)s/llvm-project/clang;-DPYTHON_EXECUTABLE=/usr/bin/python3"),
+        LLVM_BUILD_EXAMPLES="ON",
+        LLVM_BUILD_TESTS="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_TESTS="ON",
+        workdir=wd,
+        doStepIf=Makefile_not_ready
+        )
+    factory.addStep(Compile(
+            name            = 'build_llvmclang',
+            locks           = [centos6_lock.access('counting')],
+            command         = ["ninja"],
+            description     = ["building", "llvmclang"],
+            descriptionDone = ["built",    "llvmclang"],
+            workdir=wd))
+
+    BlobPost(factory)
+
+    yield BuilderConfig(
+        name="i686-mingw32-RA-on-linux",
+        category="Linux cross",
+        slavenames=["centos6"],
+        #mergeRequests=False,
+        mergeRequests=True,
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
     # CentOS5(3stage)
     factory = BuildFactory()
     AddGitLLVMTree(factory,
@@ -1556,7 +1630,8 @@ def get_builders():
             haltOnFailure = False,
             flunkOnFailure=False,
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive'),
                 ],
             command=[
@@ -1586,7 +1661,8 @@ def get_builders():
             name            = 'stage1_test_llvm',
             command         = ["make", "LIT_ARGS=--use-processes -v -j8", "check"],
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive'),
                 ],
             flunkOnFailure  = False,
@@ -1601,7 +1677,8 @@ def get_builders():
             name            = 'stage1_test_clang',
             command         = ["make", "TESTARGS=--use-processes -v -j8", "-C", "tools/clang/test"],
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive')],
             flunkOnFailure  = False,
             warnOnWarnings = False,
@@ -2189,7 +2266,8 @@ def get_builders():
             timeout=3600,
             workdir=wd,
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive')
                 ],
             command=[
@@ -2257,7 +2335,8 @@ def get_builders():
             name="build_llvm_all",
             timeout=3600,
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive'),
                 ],
             workdir=wd,
@@ -2272,7 +2351,8 @@ def get_builders():
             name="install_llvm",
             timeout=3600,
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive'),
                 ],
             workdir=wd,
@@ -2290,7 +2370,8 @@ def get_builders():
             timeout=3600,
             workdir=wd,
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive'),
                 ],
             command=[
@@ -2355,7 +2436,8 @@ def get_builders():
             name="build_clang",
             timeout=3600,
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive'),
                 ],
             workdir=wd,
@@ -2385,7 +2467,8 @@ def get_builders():
             name="build_clang_all",
             timeout=3600,
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive'),
                 ],
             workdir=wd,
@@ -2400,7 +2483,8 @@ def get_builders():
             name="install_clang",
             timeout=3600,
             locks = [
-                win7_cyg_glock.access('counting'),
+                win7_cyg_glock.access('exclusive'),
+                #win7_cyg_glock.access('counting'),
                 win7_cyg_lock.access('exclusive'),
                 ],
             workdir=wd,

@@ -18,6 +18,7 @@ def Tllvmlib(l):
     return filter_t(l, r'^llvm/(include|lib|tools|utils)/')
 def Fllvmtest(l): return filter_f(l, r'^llvm/test/.+/')
 def Fclangtest(l): return filter_f(l, r'^clang/test/.+/')
+def Ftoolstest(l): return filter_f(l, r'^clang-tools-extra/test/.+/')
 def Fhtml(l): return filter_f(l, r'\.(TXT|html|rst)(\.\w)?$')
 def FGNUmake(l): return filter_f(l, r'/Makefile(\.\w+)?$')
 def Fautoconf(l): return filter_f(FGNUmake(l), r'^llvm/(autoconf/|config.*)')
@@ -60,6 +61,15 @@ def filter_cmake_llvmclang(change):
     return len(Fhtml(l)) > 0
 
 change_cmake_llvmclang = ChangeFilter(filter_fn = filter_cmake_llvmclang)
+
+def filter_cmake_llvmclang_build(change):
+    l = Fautoconf(getattr(change, "files"))
+    l = Tclang(l) + Tllvm(l) + Tclang_extra(l)
+    if len(Tcmake(l)) > 0:
+        return True
+    return len(Ftoolstest(Fclangtest(Fllvmtest(Fhtml(l))))) > 0
+
+change_cmake_llvmclang_build = ChangeFilter(filter_fn = filter_cmake_llvmclang_build)
 
 def filter_cmake_clang(change):
     l = Fautoconf(getattr(change, "files"))
@@ -131,6 +141,18 @@ def get_schedulers():
             "cmake-clang-tools-x86_64-linux",
             ])
     yield tools_linux
+
+    mingw32_linux = AnyBranchScheduler(
+        name="s_i686-mingw32-RA-on-linux",
+        change_filter = change_cmake_llvmclang_build,
+        #treeStableTimer=None,
+        treeStableTimer=2,
+        upstreams=[llvm_linux, clang_linux, tools_linux],
+        #waitAllUpstreams=False,
+        builderNames=[
+            "i686-mingw32-RA-on-linux",
+            ])
+    yield mingw32_linux
 
     # dragonegg_linux = AnyBranchScheduler(
     #     name="s_cmake-dragonegg-x86_64-linux",
@@ -266,6 +288,7 @@ def get_schedulers():
 #            "cmake-clang-i686-msvc10",
             "cmake-llvm-x86_64-linux",
             "clang-3stage-x86_64-linux",
+            "i686-mingw32-RA-on-linux",
 #            "clang-ppc-linux",
             "clang-3stage-i686-cygwin",
             "clang-i686-cygwin-RA-centos6",
