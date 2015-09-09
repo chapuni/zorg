@@ -144,7 +144,7 @@ def get_schedulers():
 
     mingw32_linux = AnyBranchScheduler(
         name="s_i686-mingw32-RA-on-linux",
-        change_filter = change_cmake_llvmclang_build,
+        change_filter = change_cmake_llvmclang,
         #treeStableTimer=None,
         treeStableTimer=2,
         upstreams=[llvm_linux, clang_linux, tools_linux],
@@ -190,7 +190,7 @@ def get_schedulers():
         name="s_ninja-clang-i686-msc18-R",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=1 * 60,
-        upstreams=[cyg_centos6, x64_centos6, llvm_linux, clang_linux, tools_linux],
+        upstreams=[cyg_centos6, x64_centos6, mingw32_linux],
         builderNames=[
             "ninja-clang-i686-msc18-R",
             ])
@@ -200,7 +200,7 @@ def get_schedulers():
         name="s_cmake-clang-x64-mingw64",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=2 * 60,
-        upstreams=[llvmclang_msc18],
+        upstreams=[llvmclang_msc18, mingw32_linux],
         builderNames=[
             "ninja-clang-x64-mingw64-RA",
             ])

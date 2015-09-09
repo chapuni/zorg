@@ -1199,6 +1199,9 @@ def get_builders():
         CMAKE_C_COMPILER="i686-w64-mingw32-gcc",
         CMAKE_CXX_COMPILER="i686-w64-mingw32-g++",
         __CROSS_TOOLCHAIN_FLAGS_NATIVE=WithProperties("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=-DCMAKE_C_COMPILER=/home/bb/bin/gcc47;-DCMAKE_CXX_COMPILER=/home/bb/bin/g++47;-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%(workdir)s/llvm-project/clang;-DPYTHON_EXECUTABLE=/usr/bin/python3"),
+        CMAKE_EXE_LINKER_FLAGS   ="-Wl,--no-insert-timestamp",
+        CMAKE_MODULE_LINKER_FLAGS="-Wl,--no-insert-timestamp",
+        CMAKE_SHARED_LINKER_FLAGS="-Wl,--no-insert-timestamp",
         LLVM_BUILD_EXAMPLES="ON",
         LLVM_BUILD_TESTS="ON",
         CLANG_BUILD_EXAMPLES="ON",
@@ -1306,7 +1309,7 @@ def get_builders():
                     LLVM_ENABLE_ASSERTIONS="ON",
                     LLVM_BUILD_EXAMPLES="ON",
                     CLANG_BUILD_EXAMPLES="ON",
-                    BUILD_SHARED_LIBS="ON",
+                    #BUILD_SHARED_LIBS="ON",
                     __CMAKE_EXE_LINKER_FLAGS=WithProperties("-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,%(workdir)s/build/lib"),
                     LLVM_BINUTILS_INCDIR="/usr/include",
                     prefix="builds/install/stage1")
@@ -1934,7 +1937,8 @@ def get_builders():
 
 
     # ninja-clang-x64-mingw64-RA
-    gccpath = "C:/mingw-builds/x64-4.8.1-posix-seh-rev5/mingw64/bin"
+    #gccpath = "C:/mingw-builds/x64-4.8.1-posix-seh-rev5/mingw64/bin"
+    gccpath = "C:/mingw-w64/x86_64-4.8.5-posix-seh-rt_v4-rev0/mingw64/bin"
     factory = BuildFactory()
     AddGitWin7(factory)
     BlobPre(factory)
@@ -2288,6 +2292,7 @@ def get_builders():
         buildClang=False,
         __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_BUILD_EXAMPLES="ON",
         workdir=wd,
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
@@ -2394,6 +2399,7 @@ def get_builders():
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
         CMAKE_CXX_FLAGS="/DWIN32 /D_WINDOWS /W3 /Zm1000 /bigobj /GR /EHsc",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        CLANG_BUILD_EXAMPLES="ON",
         workdir=wd,
         doStepIf=Makefile_not_ready)
     factory.addStep(Compile(
