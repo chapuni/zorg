@@ -814,6 +814,21 @@ def get_builders():
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_BINUTILS_INCDIR="/usr/include",
         doStepIf=Makefile_not_ready)
+
+    # For ccache
+    factory.addStep(Compile(
+            name            = 'recheck_cmake',
+            command         = ["ninja", "build.ninja"],
+            ))
+    factory.addStep(Compile(
+            name            = 'Tweak build.ninja',
+            command         = [
+                "sed", "-i", "-r",
+                r's=(-I|_COMPILER )/home/bb/cmake-llvm-x86_64-linux/llvm-project=\1../llvm-project=g',
+                "build.ninja",
+                ],
+            ))
+
     factory.addStep(Compile(
             name            = 'build_llvm',
             command         = ["ninja", "check-all"],
@@ -908,6 +923,21 @@ def get_builders():
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         CLANG_BUILD_EXAMPLES="ON",
         doStepIf=Makefile_not_ready)
+
+    # For ccache
+    factory.addStep(Compile(
+            name            = 'recheck_cmake',
+            command         = ["ninja", "build.ninja"],
+            ))
+    factory.addStep(Compile(
+            name            = 'Tweak build.ninja',
+            command         = [
+                "sed", "-i", "-r",
+                r's=(-I|_COMPILER )/home/bb/cmake-clang-x86_64-linux/llvm-project=\1../llvm-project=g',
+                "build.ninja",
+                ],
+            ))
+
     factory.addStep(Compile(
             name            = 'build_clang',
             locks           = [centos6_lock.access('counting')],
@@ -975,7 +1005,7 @@ def get_builders():
     CheckMakefile(factory, makefile="build.ninja")
     AddCMakeCentOS6Ninja(
         factory,
-        LLVM_TARGETS_TO_BUILD="X86",
+        #LLVM_TARGETS_TO_BUILD="X86",
         LLVM_BUILD_EXAMPLES="OFF",
         LLVM_BUILD_RUNTIME="OFF",
         LLVM_BUILD_TESTS="OFF",
@@ -984,6 +1014,21 @@ def get_builders():
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         CLANG_BUILD_EXAMPLES="ON",
         doStepIf=Makefile_not_ready)
+
+    # For ccache
+    factory.addStep(Compile(
+            name            = 'recheck_cmake',
+            command         = ["ninja", "build.ninja"],
+            ))
+    factory.addStep(Compile(
+            name            = 'Tweak build.ninja',
+            command         = [
+                "sed", "-i", "-r",
+                r's=(-I|_COMPILER )/home/bb/cmake-clang-tools-x86_64-linux/llvm-project=\1../llvm-project=g',
+                "build.ninja",
+                ],
+            ))
+
     factory.addStep(Compile(
             name            = 'build_clang_tools',
             locks           = [centos6_lock.access('counting')],
@@ -1002,12 +1047,6 @@ def get_builders():
             descriptionDone = ["test",    "clang-tools"],
             timeout=60,
             ))
-    # factory.addStep(Compile(
-    #         #locks           = [centos6_lock.access('counting')],
-    #         name            = 'build_all',
-    #         command         = ["ninja"],
-    #         description     = ["building", "all"],
-    #         descriptionDone = ["built",    "all"]))
 
     BlobPost(factory)
     yield BuilderConfig(
