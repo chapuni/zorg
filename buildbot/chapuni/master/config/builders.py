@@ -23,6 +23,9 @@ def clang_not_ready(step):
 def Makefile_not_ready(step):
     return step.build.getProperty("exists_Makefile") != "OK"
 
+def Makefile_not_ready2(step):
+    return step.build.getProperty("exists_Makefile2") != "OK"
+
 def Revision_known(step):
     return not step.build.getProperty("revision_hash") in ("", None)
 
@@ -65,6 +68,17 @@ def CheckMakefile(factory, makefile="Makefile", workdir="build"):
             flunkOnFailure=False,
             workdir=workdir,
             property="exists_Makefile"))
+
+def CheckMakefile2(factory, makefile="Makefile", workdir="build"):
+    factory.addStep(SetPropertyFromCommand(
+            name="Makefile_isready",
+            command=[
+                "sh", "-c",
+                "test -e %s && echo OK" % makefile,
+                ],
+            flunkOnFailure=False,
+            workdir=workdir,
+            property="exists_Makefile2"))
 
 # Factories
 def AddGitLLVMTree(factory, repo, ref):
@@ -1168,13 +1182,13 @@ def get_builders():
 
     PatchLLVMClang(factory, "llvmclang.diff")
     wd="builds/tblgen"
-    #CheckMakefile(factory, makefile="build.ninja", workdir=wd)
+    CheckMakefile2(factory, makefile="build.ninja", workdir=wd)
     AddCMakeCentOS6Ninja(
         factory,
         source="../../llvm-project/llvm",
         LLVM_ENABLE_ASSERTIONS="ON",
         workdir=wd,
-        #doStepIf=Makefile_not_ready
+        doStepIf=Makefile_not_ready2
         )
     factory.addStep(Compile(
             name="build_tblgen",
@@ -1195,9 +1209,9 @@ def get_builders():
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
         __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/"+tblgen+"/bin/llvm-tblgen"),
         __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/"+tblgen+"/bin/clang-tblgen"),
-        CMAKE_TOOLCHAIN_FILE="/usr/share/mingw/toolchain-mingw32.cmake",
-        CMAKE_C_COMPILER="i686-w64-mingw32-gcc",
-        CMAKE_CXX_COMPILER="i686-w64-mingw32-g++",
+        CMAKE_TOOLCHAIN_FILE="../../toolchain-mingw32.cmake",
+        #CMAKE_C_COMPILER="i686-w64-mingw32-gcc",
+        #CMAKE_CXX_COMPILER="i686-w64-mingw32-g++",
         __CROSS_TOOLCHAIN_FLAGS_NATIVE=WithProperties("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=-DCMAKE_C_COMPILER=/home/bb/bin/gcc47;-DCMAKE_CXX_COMPILER=/home/bb/bin/g++47;-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%(workdir)s/llvm-project/clang;-DPYTHON_EXECUTABLE=/usr/bin/python3"),
         CMAKE_EXE_LINKER_FLAGS   ="-Wl,--no-insert-timestamp",
         CMAKE_MODULE_LINKER_FLAGS="-Wl,--no-insert-timestamp",
