@@ -169,7 +169,7 @@ def get_schedulers():
     cyg_centos6 = AnyBranchScheduler(
         name="s_clang-i686-cygwin-RA-centos6",
         change_filter = change_autoconf_llvmclang,
-        treeStableTimer=5,
+        treeStableTimer=30,
         upstreams=[llvm_linux, clang_linux],
         builderNames=[
             "clang-i686-cygwin-RA-centos6",
