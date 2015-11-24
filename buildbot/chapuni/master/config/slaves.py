@@ -15,4 +15,5 @@ def get_build_slaves():
         create_slave("win7", keepalive_interval=5*60),
         create_slave("cygwin"),
         create_slave("ps3-f12"),
+        create_slave("lab-sled4"),
         ]
