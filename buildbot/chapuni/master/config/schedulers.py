@@ -45,13 +45,20 @@ def filter_all(change):
     return len(Tclang(l) + Tllvm(l)) > 0
 
 change_llvmclang = ChangeFilter(filter_fn = filter_all)
+change_llvmclang_release_38 = ChangeFilter(
+    filter_fn = filter_all,
+    branch=['release_38'],
+    )
 
 def filter_autoconf_llvmclang(change):
     l = Fcmake(getattr(change, "files"))
     l = Tclang(l) + Tllvm(l)
     return len(Fhtml(l)) > 0
 
-change_autoconf_llvmclang = ChangeFilter(filter_fn = filter_autoconf_llvmclang)
+change_autoconf_llvmclang = ChangeFilter(
+    filter_fn = filter_autoconf_llvmclang,
+    branch=['release_38'],
+    )
 
 def filter_cmake_llvmclang(change):
     l = Fautoconf(getattr(change, "files"))
@@ -180,7 +187,7 @@ def get_schedulers():
         name="s_ninja-x64-msvc-RA-centos6",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=10,
-        upstreams=[llvm_linux, clang_linux, tools_linux,cyg_centos6],
+        upstreams=[llvm_linux, clang_linux, tools_linux],
         builderNames=[
             "ninja-x64-msvc-RA-centos6",
             ])
@@ -190,7 +197,7 @@ def get_schedulers():
         name="s_ninja-clang-i686-msc18-R",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=1 * 60,
-        upstreams=[cyg_centos6, x64_centos6, mingw32_linux],
+        upstreams=[x64_centos6, mingw32_linux],
         builderNames=[
             "ninja-clang-i686-msc18-R",
             ])
@@ -228,7 +235,7 @@ def get_schedulers():
 
     clang_3stage_i686_linux = AnyBranchScheduler(
         name="s_clang-3stage-i686-linux",
-        change_filter = change_llvmclang,
+        change_filter = change_llvmclang_release_38,
         treeStableTimer=20 * 60,
         upstreams=[llvm_linux, clang_linux,cyg_centos6],
         builderNames=[
@@ -240,7 +247,7 @@ def get_schedulers():
         name="s_clang-3stage-x86_64-linux",
         change_filter = change_llvmclang,
         treeStableTimer=25 * 60,
-        upstreams=[llvm_linux, clang_linux,cyg_centos6,clang_3stage_i686_linux],
+        upstreams=[llvm_linux, clang_linux],
         builderNames=[
             "clang-3stage-x86_64-linux",
             ])

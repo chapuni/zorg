@@ -528,6 +528,7 @@ def BuildStage32N77(factory, n,
                 "--disable-assertions",
                 "--enable-cxx11",
                 "--with-optimize-option=-m32 -O3 -Wdocumentation",
+                # -Wmisleading-indentation
                 "--build=i686-redhat-linux",
                 "--enable-optimized"],
             name="configure",
@@ -812,19 +813,7 @@ def get_builders():
     factory = BuildFactory()
     AddGitSled4(factory)
 
-    #BlobPre(factory)
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("tmp"),
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TEMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMPDIR",
-            flunkOnFailure=False))
+    BlobPre(factory)
     AddCleanBin(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -876,7 +865,7 @@ def get_builders():
             description     = ["building", "all"],
             descriptionDone = ["built",    "all"]))
 
-    #BlobPost(factory)
+    BlobPost(factory)
 
     yield BuilderConfig(
         name="cmake-llvm-x86_64-linux",
@@ -919,19 +908,7 @@ def get_builders():
     # CentOS6(clang only)
     factory = BuildFactory()
     AddGitSled4(factory)
-    #BlobPre(factory)
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("tmp"),
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TEMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMPDIR",
-            flunkOnFailure=False))
+    BlobPre(factory)
     AddCleanBin(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -990,7 +967,7 @@ def get_builders():
             description     = ["building", "all"],
             descriptionDone = ["built",    "all"]))
 
-    #BlobPost(factory)
+    BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-x86_64-linux",
         category="Linux fast",
@@ -1009,19 +986,7 @@ def get_builders():
     # CentOS6(tools only)
     factory = BuildFactory()
     AddGitSled4(factory)
-    #BlobPre(factory)
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("tmp"),
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TEMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMPDIR",
-            flunkOnFailure=False))
+    BlobPre(factory)
     AddCleanBin(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -1073,7 +1038,7 @@ def get_builders():
             timeout=60,
             ))
 
-    #BlobPost(factory)
+    BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-tools-x86_64-linux",
         category="Linux fast",
@@ -1173,19 +1138,7 @@ def get_builders():
     # MS target on CentOS6
     factory = BuildFactory()
     AddGitSled4(factory)
-    #BlobPre(factory)
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("tmp"),
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TEMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMPDIR",
-            flunkOnFailure=False))
+    BlobPre(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
@@ -1233,7 +1186,7 @@ def get_builders():
             description     = ["building", "all"],
             descriptionDone = ["built",    "all"]))
 
-    #BlobPost(factory)
+    BlobPost(factory)
     yield BuilderConfig(
         name="ninja-x64-msvc-RA-centos6",
         category="Linux cross",
@@ -1386,20 +1339,7 @@ def get_builders():
     # CentOS6(3stage)
     factory = BuildFactory()
     AddGitSled4(factory)
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("tmp"),
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TEMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMPDIR",
-            flunkOnFailure=False))
-
-    #BlobPre(factory)
+    BlobPre(factory)
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -1459,7 +1399,7 @@ def get_builders():
     BuildStageNCMake(factory, 3, False)
 
     # Trail
-    #BlobPost(factory)
+    BlobPost(factory)
     # factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
     #                                 flunkOnFailure=False))
     # factory.addStep(ShellCommand(name="save_builds",
@@ -1488,19 +1428,7 @@ def get_builders():
     # i686-CentOS6(3stage)
     factory = BuildFactory()
     AddGitSled4(factory)
-    #BlobPre(factory)
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("tmp"),
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TEMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMPDIR",
-            flunkOnFailure=False))
+    BlobPre(factory)
     factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
                                     flunkOnFailure=False))
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -1600,8 +1528,8 @@ def get_builders():
     # stage 3
     BuildStage32N77(factory, 3, False)
 
-    # # Trail
-    # #BlobPost(factory)
+    # Trail
+    BlobPost(factory)
     Compare23(
         factory,
         )
@@ -1623,19 +1551,7 @@ def get_builders():
     factory = BuildFactory()
     AddGitSled4(factory)
 
-    #BlobPre(factory)
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("tmp"),
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TEMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMP",
-            flunkOnFailure=False))
-    factory.addStep(MakeDirectory(
-            dir="tmp/TMPDIR",
-            flunkOnFailure=False))
+    BlobPre(factory)
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
@@ -1705,7 +1621,7 @@ def get_builders():
                 "-j77"],
             ))
 
-    #BlobPost(factory)
+    BlobPost(factory)
 
     yield BuilderConfig(
         name="clang-i686-cygwin-RA-centos6",
