@@ -68,6 +68,10 @@ def filter_cmake_llvmclang(change):
     return len(Fhtml(l)) > 0
 
 change_cmake_llvmclang = ChangeFilter(filter_fn = filter_cmake_llvmclang)
+change_cmake_llvmclang_release_38 = ChangeFilter(
+    filter_fn = filter_cmake_llvmclang,
+    branch=['release_38'],
+    )
 
 def filter_cmake_llvmclang_build(change):
     l = Fautoconf(getattr(change, "files"))
@@ -193,11 +197,21 @@ def get_schedulers():
             ])
     yield x64_centos6
 
+    llvmclang_msc19 = AnyBranchScheduler(
+        name="s_ninja-clang-i686-msc19-R",
+        change_filter = change_cmake_llvmclang,
+        treeStableTimer=1 * 60,
+        upstreams=[x64_centos6, mingw32_linux],
+        builderNames=[
+            "ninja-clang-i686-msc19-R",
+            ])
+    yield llvmclang_msc19
+
     llvmclang_msc18 = AnyBranchScheduler(
         name="s_ninja-clang-i686-msc18-R",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=1 * 60,
-        upstreams=[x64_centos6, mingw32_linux],
+        upstreams=[llvmclang_msc19],
         builderNames=[
             "ninja-clang-i686-msc18-R",
             ])
@@ -207,15 +221,25 @@ def get_schedulers():
         name="s_cmake-clang-x64-mingw64",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=2 * 60,
-        upstreams=[llvmclang_msc18, mingw32_linux],
+        upstreams=[llvmclang_msc19, mingw32_linux],
         builderNames=[
             "ninja-clang-x64-mingw64-RA",
             ])
     yield llvmclang_mingw64
 
+    llvmclang_msc19_x64 = AnyBranchScheduler(
+        name="s_msbuild-llvmclang-x64-msc19-DA",
+        change_filter = change_cmake_llvmclang,
+        treeStableTimer=30 * 60,
+        upstreams=[llvmclang_msc19,llvmclang_mingw64,x64_centos6],
+        builderNames=[
+            "msbuild-llvmclang-x64-msc19-DA",
+            ])
+    yield llvmclang_msc19_x64
+
     llvmclang_msc18_x64 = AnyBranchScheduler(
         name="s_msbuild-llvmclang-x64-msc18-DA",
-        change_filter = change_cmake_llvmclang,
+        change_filter = change_cmake_llvmclang_release_38,
         treeStableTimer=30 * 60,
         upstreams=[llvmclang_msc18,llvmclang_mingw64,x64_centos6],
         builderNames=[
@@ -287,8 +311,10 @@ def get_schedulers():
             "clang-3stage-i686-linux",
 #            "cmake-clang-i686-mingw32",
             "ninja-clang-x64-mingw64-RA",
+            "ninja-clang-i686-msc19-R",
             "ninja-clang-i686-msc18-R",
 #            "ninja-clang-i686-msc17-R",
+            "msbuild-llvmclang-x64-msc19-DA",
             "msbuild-llvmclang-x64-msc18-DA",
 #            "msbuild-llvmclang-x64-msc17-DA",
 #            "cmake-clang-x64-msc16-R",

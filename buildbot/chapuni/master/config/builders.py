@@ -43,10 +43,16 @@ from buildbot import locks
 centos5_lock = locks.SlaveLock("centos5_lock")
 centos6_lock = locks.SlaveLock("centos6_lock")
 sled4_git_lock = locks.SlaveLock("sled4_git_lock")
+sled3_git_lock = locks.SlaveLock("sled3_git_lock")
 win7_git_lock = locks.SlaveLock("win7_git_lock")
 win7_cyg_lock = locks.MasterLock("win7_cyg_lock")
 win7_cyg_glock = locks.MasterLock(
     "win7_cyg_lock",
+    maxCount=4,
+    )
+sled3_lock = locks.MasterLock("sled3_lock")
+sled3_glock = locks.MasterLock(
+    "sled3_glock",
     maxCount=4,
     )
 
@@ -168,6 +174,16 @@ def AddGitSled4(factory):
         'ssh://bb@t.pgr.jp:19922/var/cache/llvm-project-tree.git',
         '/home/bb/llvm-project.git')
 
+def AddGitSled3(factory):
+    AddGitFetch(
+        factory,
+        "C:/llvm-project.git",
+        [sled3_lock.access('counting')])
+    AddGitLLVMTree(
+        factory,
+        'ssh://bb@t.pgr.jp:19922/var/cache/llvm-project-tree.git',
+        'C:/llvm-project.git')
+
 def AddGitWin7(factory):
     AddGitFetch(
         factory,
@@ -257,11 +273,12 @@ def AddCMakeCentOS6Ninja(factory,
 
 def AddCMakeDOS(factory, G,
                 LLVM_LIT_ARGS="-v",
+                LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
                 **kwargs):
     AddCMake(factory, G,
              LLVM_TARGETS_TO_BUILD="all",
              LLVM_LIT_ARGS=LLVM_LIT_ARGS,
-             LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
+             LLVM_LIT_TOOLS_DIR=LLVM_LIT_TOOLS_DIR,
              **kwargs)
 
 def AddLitDOS(factory, name, dir,
@@ -284,6 +301,34 @@ def AddLitDOS(factory, name, dir,
             command         = [
                 "c:/Python27/python.exe", lit,
                 "-v",
+                "--param", "build_mode="+build_mode,
+                dir,
+                ],
+            workdir=workdir,
+            description     = ["testing", name],
+            descriptionDone = ["test",    name]))
+
+def AddLitSled3(factory, name, dir,
+              lit="../llvm-project/llvm/utils/lit/lit.py",
+              lock=True,
+              glock=False,
+              workdir="build",
+              build_mode='.'):
+    locks = []
+    if glock:
+        locks = [
+            sled3_glock.access('exclusive'),
+            sled3_lock.access('exclusive'),
+            ]
+    elif lock:
+        locks = [sled3_lock.access('exclusive')]
+    factory.addStep(LitTestCommand(
+            name            = 'test-' + name,
+            locks = locks,
+            command         = [
+                "C:/Users/Buildbot/AppData/Local/Programs/Python/Python35/python.exe", lit,
+                "-v",
+                "--use-processes", "-j80",
                 "--param", "build_mode="+build_mode,
                 dir,
                 ],
@@ -731,18 +776,19 @@ def BlobAdd(factory, dirs):
             timeout=3600,
             workdir="."))
 
-def BlobPre(factory):
-    factory.addStep(ShellCommand(
-            name="blob-prebuild",
-            description="Adding prebuild blob",
-            descriptionDone="Added prebuild blob",
-            command=[
-                "sh", "-c",
-                WithProperties("../blob.pl branch=%(branch)s buildnumber=%(buildnumber)s"),
-                ],
-            flunkOnFailure=False,
-            timeout=3600,
-            workdir="."))
+def BlobPre(factory, do_blob=True):
+    if do_blob:
+        factory.addStep(ShellCommand(
+                name="blob-prebuild",
+                description="Adding prebuild blob",
+                descriptionDone="Added prebuild blob",
+                command=[
+                    "sh", "-c",
+                    WithProperties("../blob.pl branch=%(branch)s buildnumber=%(buildnumber)s"),
+                    ],
+                flunkOnFailure=False,
+                timeout=3600,
+                workdir="."))
     factory.addStep(RemoveDirectory(
             dir=WithProperties("tmp"),
             flunkOnFailure=False))
@@ -2270,6 +2316,396 @@ def get_builders():
             'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\8.1\include\shared;C:\Program Files (x86)\Windows Kits\8.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\winrt',
             'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
             'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\Microsoft SDKs\F#\3.1\Framework\v4.0\;C:\Program Files (x86)\MSBuild\12.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Windows\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools;${PATH};C:\bb-win7',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
+    # ninja-msc19
+    ninja = "ninja.exe"
+    factory = BuildFactory()
+    AddGitSled3(factory)
+    BlobPre(factory, False)
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeDOS(
+        factory, "Ninja",
+        CMAKE_MAKE_PROGRAM=ninja,
+        CMAKE_BUILD_TYPE="Release",
+        LLVM_LIT_TOOLS_DIR="C:/msys64/usr/bin",
+        LLVM_ENABLE_ASSERTIONS="OFF",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        CMAKE_C_COMPILER="C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/cl.exe",
+        CMAKE_CXX_COMPILER="C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/cl.exe",
+        doStepIf=Makefile_not_ready)
+
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            locks = [sled3_lock.access('exclusive')],
+            command         = [ninja, "check-clang-tools"],
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
+    factory.addStep(Compile(
+            name            = 'build_clang_tools',
+            command         = [ninja, "-k64", "check-clang-tools"],
+            description     = ["building", "tools"],
+            descriptionDone = ["built",    "tools"]))
+    AddLitSled3(factory, "clang-tools", "tools/clang/tools/extra/test")
+    # BlobAdd(factory, [
+    #         "build/tools/clang",
+    #         ])
+
+    factory.addStep(Compile(
+            name            = 'build_llvm',
+            locks = [sled3_lock.access('exclusive')],
+            command         = [ninja, "check-llvm"],
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            description     = ["building", "llvm"],
+            descriptionDone = ["built",    "llvm"]))
+    factory.addStep(Compile(
+            name            = 'build_llvm',
+            command         = [ninja, "-k64", "check-llvm"],
+            description     = ["building", "llvm"],
+            descriptionDone = ["built",    "llvm"]))
+    # BlobAdd(factory, [
+    #         "build/bin",
+    #         "build/include",
+    #         "build/lib",
+    #         "build/tools",
+    #         "build/unittests",
+    #         "build/utils",
+    #         ])
+    AddLitSled3(factory, "llvm", "test")
+    #BlobAdd(factory, ["build/test"])
+
+    factory.addStep(Compile(
+            name            = 'build_clang',
+            locks = [sled3_lock.access('exclusive')],
+            command         = [ninja, "check-clang"],
+            description     = ["building", "clang"],
+            descriptionDone = ["built",    "clang"]))
+    factory.addStep(Compile(
+            name            = 'build_clang',
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            command         = [ninja, "-k64", "check-clang"],
+            description     = ["building", "clang"],
+            descriptionDone = ["built",    "clang"]))
+    # BlobAdd(factory, [
+    #         "build/bin",
+    #         "build/lib",
+    #         "build/tools/clang/include",
+    #         "build/tools/clang/lib",
+    #         "build/tools/clang/tools",
+    #         "build/tools/clang/unittests",
+    #         ])
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
+    AddLitSled3(factory, "clang", "tools/clang/test")
+    #BlobAdd(factory, ["build/tools/clang"])
+
+    factory.addStep(Compile(
+            command=[ninja],
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            ))
+    factory.addStep(Compile(
+            command=[ninja, "install"],
+            ))
+
+    #BlobPost(factory)
+    yield BuilderConfig(
+        name="ninja-clang-i686-msc19-R",
+        category="Windows",
+        locks=[sled3_glock.access('counting')],
+        mergeRequests=True,
+        slavenames=["lab-sled3"],
+        env={
+            'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\10\include\10.0.10240.0\ucrt;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\\shared;C:\Program Files (x86)\Windows Kits\8.1\include\\um;C:\Program Files (x86)\Windows Kits\8.1\include\\winrt',
+            'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\10\lib\10.0.10240.0\ucrt\x86;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\lib\um\x86;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
+            'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\14.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools;C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\;${PATH};C:\Program Files (x86)\CMake-3.4\bin',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
+    # msc19 x64
+    msbuild = "C:/Program Files (x86)/MSBuild/14.0/bin/amd64/msbuild.exe" 
+    factory = BuildFactory()
+    AddGitSled3(factory)
+    BlobPre(factory, False)
+    PatchLLVMClang(factory, "llvmclang.diff")
+
+    wd="builds/tblgen"
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 14 Win64",
+        source="../../llvm-project/llvm",
+        prefix="install/llvm",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Release"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Release",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_llvm_tblgen",
+            timeout=3600,
+            workdir=wd,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive')
+                ],
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Release",
+                "utils/TableGen/llvm-tblgen.vcxproj"]))
+    #BlobAdd(factory, [wd])
+
+    wd="builds/llvm"
+    factory.addStep(SetProperty(property="exists_Makefile", value=''))
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 14 Win64",
+        source="../../llvm-project/llvm",
+        prefix="install/llvm",
+        buildClang=False,
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_BUILD_EXAMPLES="ON",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Debug"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_llvm",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "test/check-llvm.vcxproj"]))
+    # BlobAdd(factory, [
+    #         wd+"/Debug",
+    #         wd+"/include",
+    #         wd+"/lib",
+    #         wd+"/unittests",
+    #         wd+"/utils",
+    #         ])
+    AddLitSled3(factory, "llvm", "test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              glock=True,
+              workdir=wd,
+              build_mode='Debug')
+    #BlobAdd(factory, [wd+"/test"])
+    factory.addStep(Compile(
+            name="build_llvm_all",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "LLVM.sln"]))
+    #BlobAdd(factory, [wd])
+    factory.addStep(Compile(
+            name="install_llvm",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "INSTALL.vcxproj"]))
+    #BlobAdd(factory, ["install/llvm"])
+
+    wd="builds/tblgen"
+    factory.addStep(Compile(
+            name="build_clang_tblgen",
+            timeout=3600,
+            workdir=wd,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Release",
+                "tools/clang/utils/TableGen/clang-tblgen.vcxproj"]))
+    #BlobAdd(factory, [wd])
+
+    wd="builds/clang"
+    factory.addStep(SetProperty(property="exists_Makefile", value=''))
+    CheckMakefile(factory, makefile="ALL_BUILD.vcxproj", workdir=wd)
+    AddCMakeDOS(
+        factory, "Visual Studio 14 Win64",
+        source="../../llvm-project/clang",
+        prefix="install/clang",
+        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(workdir)s/install/llvm/bin/llvm-config.exe"),
+        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
+        CMAKE_CXX_FLAGS="/DWIN32 /D_WINDOWS /W3 /Zm1000 /bigobj /GR /EHsc",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        CLANG_BUILD_EXAMPLES="ON",
+        workdir=wd,
+        doStepIf=Makefile_not_ready)
+    factory.addStep(Compile(
+            name="zero_check",
+            haltOnFailure = False,
+            flunkOnFailure=False,
+            warnOnFailure=True,
+            timeout=3600,
+            workdir=wd,
+            descriptionDone = ["zero_check",    "Debug"],
+            command=[
+                msbuild,
+                "-m",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "ZERO_CHECK.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_clang_tools",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "tools/extra/test/check-clang-tools.vcxproj"]))
+
+    AddLitSled3(factory, "clang-tools", "tools/extra/test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              workdir=wd,
+              build_mode='Debug')
+    # BlobAdd(factory, [
+    #         wd+"/tools/extra",
+    #         ])
+    factory.addStep(Compile(
+            name="build_clang",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "test/check-clang.vcxproj"]))
+    # BlobAdd(factory, [
+    #         wd+"/Debug",
+    #         wd+"/include",
+    #         wd+"/lib",
+    #         wd+"/tools",
+    #         wd+"/unittests",
+    #         ])
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/builds/clang/test/Modules"),
+            flunkOnFailure=False))
+    AddLitSled3(factory, "clang", "test",
+              lit="../../llvm-project/llvm/utils/lit/lit.py",
+              workdir=wd,
+              glock=True,
+              build_mode='Debug')
+    #BlobAdd(factory, [wd+"/test"])
+    factory.addStep(Compile(
+            name="build_clang_all",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "Clang.sln"]))
+    #BlobAdd(factory, [wd])
+    factory.addStep(Compile(
+            name="install_clang",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "INSTALL.vcxproj"]))
+
+    #BlobPost(factory)
+    yield BuilderConfig(
+        name="msbuild-llvmclang-x64-msc19-DA",
+        category="Windows",
+        mergeRequests=True,
+        slavenames=["lab-sled3"],
+        env={
+            'INCLUDE': r'INCLUDE=C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\10\include\10.0.10240.0\ucrt;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\\shared;C:\Program Files (x86)\Windows Kits\8.1\include\\um;C:\Program Files (x86)\Windows Kits\8.1\include\\winrt',
+            'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB\amd64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB\amd64;C:\Program Files (x86)\Windows Kits\10\lib\10.0.10240.0\ucrt\x64;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\lib\um\x64;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x64',
+            'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\14.0\bin\amd64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\BIN\amd64;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\VCPackages;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools\x64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x64;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\x64;${PATH};C:\Program Files (x86)\CMake-3.4\bin',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
             'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
