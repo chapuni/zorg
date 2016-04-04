@@ -273,7 +273,7 @@ def AddCMakeCentOS6Ninja(factory,
 
 def AddCMakeDOS(factory, G,
                 LLVM_LIT_ARGS="-v",
-                LLVM_LIT_TOOLS_DIR="D:/gnuwin32/bin",
+                LLVM_LIT_TOOLS_DIR="C:/msys64/usr/bin",
                 **kwargs):
     AddCMake(factory, G,
              LLVM_TARGETS_TO_BUILD="all",
