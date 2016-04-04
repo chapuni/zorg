@@ -2079,17 +2079,87 @@ def get_builders():
             ))
 
     BlobPost(factory)
+    # yield BuilderConfig(
+    #     name="ninja-clang-x64-mingw64-RA",
+    #     category="Windows",
+    #     locks=[win7_cyg_glock.access('counting')],
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'PATH':   dospaths([gccpath, "${PATH}", "C:/bb-win7"]),
+    #         },
+    #     factory=factory)
+
+    # ninja-clang-x64-mingw64-RA (sled3)
+    ninja = "ninja.exe"
+    factory = BuildFactory()
+    AddGitSled3(factory)
+    BlobPre(factory, False)
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeDOS(
+        factory, "Ninja",
+        CMAKE_BUILD_TYPE="Release",
+        BUILD_SHARED_LIBS="ON",
+        LLVM_LIT_TOOLS_DIR="C:/msys64/usr/bin",
+        LLVM_ENABLE_ASSERTIONS="ON",
+        LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        CMAKE_LIBRARY_PATH="C:/mingw-w64/x86_64-4.9.3-posix-seh-rt_v4-rev1/mingw64/x86_64-w64-mingw32/lib",
+        DL_LIBRARY_PATH="OFF",
+        doStepIf=Makefile_not_ready)
+
+    factory.addStep(Compile(
+            name            = 'build',
+            #locks = [sled3_lock.access('exclusive')],
+            command         = [ninja, "check-all"],
+            description     = ["building", "llvmclang"],
+            descriptionDone = ["built",    "llvmclang"]))
+    # BlobAdd(factory, [
+    #         "build/bin",
+    #         "build/include",
+    #         "build/lib",
+    #         "build/unittests",
+    #         "build/utils",
+    #         "build/tools/clang/include",
+    #         "build/tools/clang/lib",
+    #         "build/tools/clang/unittests",
+    #         ])
+
+    factory.addStep(RemoveDirectory(
+            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            flunkOnFailure=False))
+    AddLitSled3(factory, "clang", "tools/clang/test")
+    # BlobAdd(factory, ["build/tools/clang/test"])
+
+    AddLitSled3(factory, "clang-tools", "tools/clang/tools/extra/test", lock=False)
+    # BlobAdd(factory, ["build/tools/clang"])
+
+    AddLitSled3(factory, "llvm", "test")
+    # BlobAdd(factory, ["build/*"])
+
+    factory.addStep(Compile(
+            command=[ninja, "install"],
+            #locks = [sled3_lock.access('exclusive')],
+            ))
+
+    # BlobPost(factory)
     yield BuilderConfig(
         name="ninja-clang-x64-mingw64-RA",
         category="Windows",
-        locks=[win7_cyg_glock.access('counting')],
+        locks=[sled3_glock.access('counting')],
         mergeRequests=True,
-        slavenames=["win7"],
+        slavenames=["lab-sled3"],
         env={
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
             'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            'PATH':   dospaths([gccpath, "${PATH}", "C:/bb-win7"]),
+            'PATH': r'C:\mingw-w64\x86_64-4.9.3-posix-seh-rt_v4-rev1\mingw64\bin;${PATH};C:\Program Files (x86)\CMake-3.4\bin',
             },
         factory=factory)
 
@@ -2349,11 +2419,13 @@ def get_builders():
             command         = [ninja, "check-clang-tools"],
             haltOnFailure = False,
             flunkOnFailure=False,
+            warnOnWarnings = True,
             description     = ["building", "tools"],
             descriptionDone = ["built",    "tools"]))
     factory.addStep(Compile(
             name            = 'build_clang_tools',
             command         = [ninja, "-k64", "check-clang-tools"],
+            warnOnWarnings = True,
             description     = ["building", "tools"],
             descriptionDone = ["built",    "tools"]))
     AddLitSled3(factory, "clang-tools", "tools/clang/tools/extra/test")
@@ -2367,11 +2439,13 @@ def get_builders():
             command         = [ninja, "check-llvm"],
             haltOnFailure = False,
             flunkOnFailure=False,
+            warnOnWarnings = True,
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
     factory.addStep(Compile(
             name            = 'build_llvm',
             command         = [ninja, "-k64", "check-llvm"],
+            warnOnWarnings = True,
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
     # BlobAdd(factory, [
@@ -2389,13 +2463,15 @@ def get_builders():
             name            = 'build_clang',
             locks = [sled3_lock.access('exclusive')],
             command         = [ninja, "check-clang"],
+            haltOnFailure   = False,
+            flunkOnFailure  =False,
+            warnOnWarnings = True,
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
     factory.addStep(Compile(
             name            = 'build_clang',
-            haltOnFailure = False,
-            flunkOnFailure=False,
             command         = [ninja, "-k64", "check-clang"],
+            warnOnWarnings = True,
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
     # BlobAdd(factory, [
@@ -2416,6 +2492,7 @@ def get_builders():
             command=[ninja],
             haltOnFailure = False,
             flunkOnFailure=False,
+            warnOnWarnings = True,
             ))
     factory.addStep(Compile(
             command=[ninja, "install"],
@@ -2475,6 +2552,7 @@ def get_builders():
                 sled3_glock.access('exclusive'),
                 sled3_lock.access('exclusive')
                 ],
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -2500,7 +2578,6 @@ def get_builders():
             name="zero_check",
             haltOnFailure = False,
             flunkOnFailure=False,
-            warnOnFailure=True,
             timeout=3600,
             workdir=wd,
             descriptionDone = ["zero_check",    "Debug"],
@@ -2518,6 +2595,7 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -2545,6 +2623,7 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -2560,6 +2639,7 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -2573,6 +2653,7 @@ def get_builders():
             name="build_clang_tblgen",
             timeout=3600,
             workdir=wd,
+            warnOnWarnings = True,
             locks = [
                 sled3_glock.access('exclusive'),
                 sled3_lock.access('exclusive'),
@@ -2604,7 +2685,6 @@ def get_builders():
             name="zero_check",
             haltOnFailure = False,
             flunkOnFailure=False,
-            warnOnFailure=True,
             timeout=3600,
             workdir=wd,
             descriptionDone = ["zero_check",    "Debug"],
@@ -2622,6 +2702,7 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -2644,6 +2725,7 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -2674,6 +2756,7 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -2688,6 +2771,7 @@ def get_builders():
                 sled3_glock.access('exclusive'),
                 sled3_lock.access('exclusive'),
                 ],
+            warnOnWarnings = True,
             workdir=wd,
             command=[
                 msbuild,
