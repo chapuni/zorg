@@ -882,7 +882,7 @@ def get_builders():
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER )/home/bb/cmake-llvm-x86_64-linux/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb/cmake-llvm-x86_64-linux/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -980,7 +980,7 @@ def get_builders():
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER )/home/bb/cmake-clang-x86_64-linux/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb/cmake-clang-x86_64-linux/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -1060,7 +1060,7 @@ def get_builders():
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER )/home/bb/cmake-clang-tools-x86_64-linux/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb/cmake-clang-tools-x86_64-linux/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -1240,7 +1240,6 @@ def get_builders():
         #mergeRequests=False,
         mergeRequests=True,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -1250,9 +1249,7 @@ def get_builders():
 
     # i686-mingw32 on linux
     factory = BuildFactory()
-    AddGitLLVMTree(factory,
-                   '/var/cache/llvm-project-tree.git',
-                   '/var/cache/llvm-project.git')
+    AddGitSled4(factory)
     BlobPre(factory)
 
     PatchLLVMClang(factory, "llvmclang.diff")
@@ -1262,6 +1259,8 @@ def get_builders():
         factory,
         source="../../llvm-project/llvm",
         LLVM_ENABLE_ASSERTIONS="ON",
+        CMAKE_C_COMPILER="/home/bb/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
         workdir=wd,
         doStepIf=Makefile_not_ready2
         )
@@ -1285,12 +1284,12 @@ def get_builders():
         __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/"+tblgen+"/bin/llvm-tblgen"),
         __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/"+tblgen+"/bin/clang-tblgen"),
         CMAKE_TOOLCHAIN_FILE="../../toolchain-mingw32.cmake",
-        #CMAKE_C_COMPILER="i686-w64-mingw32-gcc",
-        #CMAKE_CXX_COMPILER="i686-w64-mingw32-g++",
-        __CROSS_TOOLCHAIN_FLAGS_NATIVE=WithProperties("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=-DCMAKE_C_COMPILER=/home/bb/bin/gcc47;-DCMAKE_CXX_COMPILER=/home/bb/bin/g++47;-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%(workdir)s/llvm-project/clang;-DPYTHON_EXECUTABLE=/usr/bin/python3"),
-        CMAKE_EXE_LINKER_FLAGS   ="-Wl,--no-insert-timestamp",
-        CMAKE_MODULE_LINKER_FLAGS="-Wl,--no-insert-timestamp",
-        CMAKE_SHARED_LINKER_FLAGS="-Wl,--no-insert-timestamp",
+        CMAKE_C_COMPILER="/home/bb/bin/i686-w64-mingw32-gcc",
+        CMAKE_CXX_COMPILER="/home/bb/bin/i686-w64-mingw32-g++",
+        __CROSS_TOOLCHAIN_FLAGS_NATIVE=WithProperties("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=-DCMAKE_C_COMPILER=/home/bb/bin/gcc;-DCMAKE_CXX_COMPILER=/home/bb/bin/g++;-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%(workdir)s/llvm-project/clang;-DPYTHON_EXECUTABLE=/usr/bin/python3"),
+        #CMAKE_EXE_LINKER_FLAGS   ="-Wl,--no-insert-timestamp",
+        #CMAKE_MODULE_LINKER_FLAGS="-Wl,--no-insert-timestamp",
+        #CMAKE_SHARED_LINKER_FLAGS="-Wl,--no-insert-timestamp",
         LLVM_BUILD_EXAMPLES="ON",
         LLVM_BUILD_TESTS="ON",
         CLANG_BUILD_EXAMPLES="ON",
@@ -1300,7 +1299,7 @@ def get_builders():
         )
     factory.addStep(Compile(
             name            = 'build_llvmclang',
-            locks           = [centos6_lock.access('counting')],
+            #locks           = [centos6_lock.access('counting')],
             command         = ["ninja"],
             description     = ["building", "llvmclang"],
             descriptionDone = ["built",    "llvmclang"],
@@ -1311,11 +1310,10 @@ def get_builders():
     yield BuilderConfig(
         name="i686-mingw32-RA-on-linux",
         category="Linux cross",
-        slavenames=["centos6"],
+        slavenames=["lab-sled4"],
         #mergeRequests=False,
         mergeRequests=True,
         env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
@@ -2131,8 +2129,11 @@ def get_builders():
     #         "build/tools/clang/unittests",
     #         ])
 
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+                ],
             flunkOnFailure=False))
     AddLitSled3(factory, "clang", "tools/clang/test")
     # BlobAdd(factory, ["build/tools/clang/test"])
@@ -2376,21 +2377,22 @@ def get_builders():
             ))
 
     BlobPost(factory)
-    yield BuilderConfig(
-        name="ninja-clang-i686-msc18-R",
-        category="Windows",
-        locks=[win7_cyg_glock.access('counting')],
-        mergeRequests=True,
-        slavenames=["win7"],
-        env={
-            'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\8.1\include\shared;C:\Program Files (x86)\Windows Kits\8.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\winrt',
-            'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
-            'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\Microsoft SDKs\F#\3.1\Framework\v4.0\;C:\Program Files (x86)\MSBuild\12.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Windows\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools;${PATH};C:\bb-win7',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="ninja-clang-i686-msc18-R",
+    #     category="Windows",
+    #     locks=[win7_cyg_glock.access('counting')],
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\8.1\include\shared;C:\Program Files (x86)\Windows Kits\8.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\winrt',
+    #         'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
+    #         'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\Microsoft SDKs\F#\3.1\Framework\v4.0\;C:\Program Files (x86)\MSBuild\12.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Windows\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools;C:\Program Files (x86)\CMake-3.4\bin;${PATH};C:\bb-win7',
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # ninja-msc19
     ninja = "ninja.exe"
@@ -2482,8 +2484,11 @@ def get_builders():
     #         "build/tools/clang/tools",
     #         "build/tools/clang/unittests",
     #         ])
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+                ],
             flunkOnFailure=False))
     AddLitSled3(factory, "clang", "tools/clang/test")
     #BlobAdd(factory, ["build/tools/clang"])
@@ -2739,8 +2744,11 @@ def get_builders():
     #         wd+"/tools",
     #         wd+"/unittests",
     #         ])
-    factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/builds/clang/test/Modules"),
+    factory.addStep(ShellCommand(
+            command=[
+                "rm", "-rf",
+                WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+                ],
             flunkOnFailure=False))
     AddLitSled3(factory, "clang", "test",
               lit="../../llvm-project/llvm/utils/lit/lit.py",
@@ -3063,21 +3071,21 @@ def get_builders():
                 "INSTALL.vcxproj"]))
 
     BlobPost(factory)
-    yield BuilderConfig(
-        name="msbuild-llvmclang-x64-msc18-DA",
-        category="Windows",
-        mergeRequests=True,
-        slavenames=["win7"],
-        env={
-            'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\8.1\include\shared;C:\Program Files (x86)\Windows Kits\8.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\winrt',
-            'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB\amd64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB\amd64;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x64',
-            'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\12.0\bin\amd64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN\amd64;C:\Windows\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools\x64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x64;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools\x64\;${PATH};C:\bb-win7',
-            'VisualStudioVersion': '12.0',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="msbuild-llvmclang-x64-msc18-DA",
+    #     category="Windows",
+    #     mergeRequests=True,
+    #     slavenames=["win7"],
+    #     env={
+    #         'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\8.1\include\shared;C:\Program Files (x86)\Windows Kits\8.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\winrt',
+    #         'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB\amd64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB\amd64;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x64',
+    #         'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\12.0\bin\amd64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN\amd64;C:\Windows\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools\x64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x64;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools\x64\;${PATH};C:\bb-win7',
+    #         'VisualStudioVersion': '12.0',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # msc17 x64
     msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"

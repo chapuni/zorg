@@ -207,15 +207,15 @@ def get_schedulers():
             ])
     yield llvmclang_msc19
 
-    llvmclang_msc18 = AnyBranchScheduler(
-        name="s_ninja-clang-i686-msc18-R",
-        change_filter = change_cmake_llvmclang,
-        treeStableTimer=1 * 60,
-        upstreams=[llvmclang_msc19],
-        builderNames=[
-            "ninja-clang-i686-msc18-R",
-            ])
-    yield llvmclang_msc18
+    # llvmclang_msc18 = AnyBranchScheduler(
+    #     name="s_ninja-clang-i686-msc18-R",
+    #     change_filter = change_cmake_llvmclang,
+    #     treeStableTimer=1 * 60,
+    #     upstreams=[llvmclang_msc19],
+    #     builderNames=[
+    #         "ninja-clang-i686-msc18-R",
+    #         ])
+    # yield llvmclang_msc18
 
     llvmclang_mingw64 = AnyBranchScheduler(
         name="s_cmake-clang-x64-mingw64",
@@ -237,15 +237,15 @@ def get_schedulers():
             ])
     yield llvmclang_msc19_x64
 
-    llvmclang_msc18_x64 = AnyBranchScheduler(
-        name="s_msbuild-llvmclang-x64-msc18-DA",
-        change_filter = change_cmake_llvmclang_release_38,
-        treeStableTimer=30 * 60,
-        upstreams=[llvmclang_msc18,llvmclang_mingw64,x64_centos6],
-        builderNames=[
-            "msbuild-llvmclang-x64-msc18-DA",
-            ])
-    yield llvmclang_msc18_x64
+    # llvmclang_msc18_x64 = AnyBranchScheduler(
+    #     name="s_msbuild-llvmclang-x64-msc18-DA",
+    #     change_filter = change_cmake_llvmclang_release_38,
+    #     treeStableTimer=30 * 60,
+    #     upstreams=[llvmclang_msc18,llvmclang_mingw64,x64_centos6],
+    #     builderNames=[
+    #         "msbuild-llvmclang-x64-msc18-DA",
+    #         ])
+    # yield llvmclang_msc18_x64
 
     # llvmclang_msc16_x64 = AnyBranchScheduler(
     #     name="s_cmake-clang-x64-msc16-R",
@@ -312,10 +312,10 @@ def get_schedulers():
 #            "cmake-clang-i686-mingw32",
             "ninja-clang-x64-mingw64-RA",
             "ninja-clang-i686-msc19-R",
-            "ninja-clang-i686-msc18-R",
+#            "ninja-clang-i686-msc18-R",
 #            "ninja-clang-i686-msc17-R",
             "msbuild-llvmclang-x64-msc19-DA",
-            "msbuild-llvmclang-x64-msc18-DA",
+#            "msbuild-llvmclang-x64-msc18-DA",
 #            "msbuild-llvmclang-x64-msc17-DA",
 #            "cmake-clang-x64-msc16-R",
 #            "cmake-clang-i686-msvc10",
