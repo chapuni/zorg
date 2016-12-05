@@ -9,6 +9,7 @@ def filter_t(l, e): return filter(lambda x: re.search(e, x), l)
 def filter_f(l, e): return filter(lambda x: not re.search(e, x), l)
 
 def Tllvm(l): return filter_t(l, r'^llvm/')
+def Tlld(l): return filter_t(l, r'^lld/')
 def Tclang(l): return filter_t(l, r'^clang/')
 def Tclang_extra(l): return filter_t(l, r'^clang-tools-extra/')
 def Tdragonegg(l): return filter_t(l, r'^dragonegg/')
@@ -82,6 +83,17 @@ def filter_cmake_llvmclang_build(change):
 
 change_cmake_llvmclang_build = ChangeFilter(filter_fn = filter_cmake_llvmclang_build)
 
+def filter_cmake_lld(change):
+    l = Fautoconf(getattr(change, "files"))
+    l = Tlld(l) + Tllvm(l)
+    if len(Tcmake(l)) > 0:
+        return True
+    return len(Fllvmtest(Fhtml(l))) > 0
+
+change_lld_master = ChangeFilter(filter_fn = filter_cmake_lld,
+                                   #branch=['master'],
+                                   )
+
 def filter_cmake_clang(change):
     l = Fautoconf(getattr(change, "files"))
     l = Tclang(l) + Tllvm(l)
@@ -128,6 +140,18 @@ def get_schedulers():
             "cmake-llvm-x86_64-linux",
             ])
     yield llvm_linux
+
+    lld_linux = AnyBranchScheduler(
+        name="s_lld-x86_64-linux",
+        change_filter = change_lld_master,
+        #treeStableTimer=None,
+        treeStableTimer=2,
+        upstreams=[llvm_linux],
+        waitAllUpstreams=False,
+        builderNames=[
+            "lld-x86_64-linux",
+            ])
+    yield lld_linux
 
     clang_linux = AnyBranchScheduler(
         name="s_cmake-clang-x86_64-linux",
@@ -326,6 +350,7 @@ def get_schedulers():
             "clang-3stage-i686-cygwin",
             "clang-i686-cygwin-RA-centos6",
 #            "clang-i686-msys",
+            "lld-x86_64-linux",
             ],
 
         # will generate a combo box

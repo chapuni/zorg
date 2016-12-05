@@ -171,7 +171,8 @@ def AddGitSled4(factory):
         [sled4_git_lock.access('counting')])
     AddGitLLVMTree(
         factory,
-        'ssh://bb@t.pgr.jp:19922/var/cache/llvm-project-tree.git',
+        #'ssh://bb@t.pgr.jp:19922/var/cache/llvm-project-tree.git',
+        '/home/tnakamura/llvm/llvm-project/',
         '/home/bb/llvm-project.git')
 
 def AddGitSled3(factory):
@@ -1016,6 +1017,81 @@ def get_builders():
     BlobPost(factory)
     yield BuilderConfig(
         name="cmake-clang-x86_64-linux",
+        category="Linux fast",
+        slavenames=["lab-sled4"],
+        #mergeRequests=False,
+        mergeRequests=True,
+        env={
+            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
+            'LIT_PRESERVES_TMP': '1',
+            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            },
+        factory=factory)
+
+    # lld
+    factory = BuildFactory()
+    AddGitSled4(factory)
+    BlobPre(factory)
+    AddCleanBin(factory)
+
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    AddCMakeCentOS6Ninja(
+        factory, buildClang=False,
+        LLVM_BUILD_EXAMPLES="OFF",
+        LLVM_BUILD_RUNTIME="OFF",
+        LLVM_BUILD_TESTS="OFF",
+        LLVM_BUILD_TOOLS="OFF",
+        CMAKE_C_COMPILER="/home/bb/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        LLVM_LIT_ARGS="--show-suites --no-execute -q",
+        LLVM_EXTERNAL_LLD_SOURCE_DIR="../llvm-project/lld",
+        doStepIf=Makefile_not_ready)
+
+    # For ccache
+    factory.addStep(Compile(
+            name            = 'recheck_cmake',
+            command         = ["ninja", "build.ninja"],
+            ))
+    factory.addStep(Compile(
+            name            = 'Tweak build.ninja',
+            command         = [
+                "sed", "-i", "-r",
+                r's=(-I|_COMPILER\S* )/home/bb/[^/]+/llvm-project=\1../llvm-project=g',
+                "build.ninja",
+                ],
+            ))
+
+    factory.addStep(Compile(
+            name            = 'build_lld',
+            #locks           = [centos6_lock.access('counting')],
+            command         = ["ninja", "check-all"],
+            description     = ["building", "lld"],
+            descriptionDone = ["built",    "lld"]))
+    factory.addStep(LitTestCommand(
+            name            = 'test_lld',
+            #locks           = [centos6_lock.access('counting')],
+            command         = [
+                "bin/llvm-lit",
+                "-v",
+                "tools/lld/test",
+                ],
+            description     = ["testing", "lld"],
+            descriptionDone = ["test",    "lld"],
+            timeout=60,
+            ))
+    factory.addStep(Compile(
+            #locks           = [centos6_lock.access('counting')],
+            name            = 'build_all',
+            command         = ["ninja"],
+            description     = ["building", "all"],
+            descriptionDone = ["built",    "all"]))
+
+    BlobPost(factory)
+    yield BuilderConfig(
+        name="lld-x86_64-linux",
         category="Linux fast",
         slavenames=["lab-sled4"],
         #mergeRequests=False,
