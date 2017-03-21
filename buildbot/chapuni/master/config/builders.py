@@ -43,6 +43,7 @@ from buildbot import locks
 centos5_lock = locks.SlaveLock("centos5_lock")
 centos6_lock = locks.SlaveLock("centos6_lock")
 sled4_git_lock = locks.SlaveLock("sled4_git_lock")
+sled4_build_lock = locks.SlaveLock("sled4_build_lock")
 sled3_git_lock = locks.SlaveLock("sled3_git_lock")
 win7_git_lock = locks.SlaveLock("win7_git_lock")
 win7_cyg_lock = locks.MasterLock("win7_cyg_lock")
@@ -50,8 +51,8 @@ win7_cyg_glock = locks.MasterLock(
     "win7_cyg_lock",
     maxCount=4,
     )
-sled3_lock = locks.MasterLock("sled3_lock")
-sled3_glock = locks.MasterLock(
+sled3_lock = locks.SlaveLock("sled3_lock")
+sled3_glock = locks.SlaveLock(
     "sled3_glock",
     maxCount=4,
     )
@@ -891,7 +892,7 @@ def get_builders():
     factory.addStep(Compile(
             name            = 'build_llvm',
             command         = ["ninja", "check-all"],
-            #locks           = [centos6_lock.access('counting')],
+            locks           = [sled4_build_lock.access('exclusive')],
             description     = ["building", "llvm"],
             descriptionDone = ["built",    "llvm"]))
     factory.addStep(LitTestCommand(
@@ -988,7 +989,7 @@ def get_builders():
 
     factory.addStep(Compile(
             name            = 'build_clang',
-            #locks           = [centos6_lock.access('counting')],
+            locks           = [sled4_build_lock.access('exclusive')],
             command         = ["ninja", "check-all"],
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
@@ -1066,7 +1067,7 @@ def get_builders():
 
     factory.addStep(Compile(
             name            = 'build_lld',
-            #locks           = [centos6_lock.access('counting')],
+            locks           = [sled4_build_lock.access('exclusive')],
             command         = ["ninja", "check-all"],
             description     = ["building", "lld"],
             descriptionDone = ["built",    "lld"]))
@@ -1143,7 +1144,7 @@ def get_builders():
 
     factory.addStep(Compile(
             name            = 'build_clang_tools',
-            #locks           = [centos6_lock.access('counting')],
+            locks           = [sled4_build_lock.access('exclusive')],
             command         = ["ninja", "check-clang-tools"],
             description     = ["building", "clang-tools"],
             descriptionDone = ["built",    "clang-tools"]))
@@ -1280,8 +1281,8 @@ def get_builders():
         )
     factory.addStep(Compile(
             name            = 'build_llvmclang',
-            #locks           = [centos6_lock.access('counting')],
-            command         = ["ninja", "-l80", "check-all"],
+            locks           = [sled4_build_lock.access('exclusive')],
+            command         = ["ninja", "-j77", "check-all"],
             description     = ["building", "llvmclang"],
             descriptionDone = ["built",    "llvmclang"]))
     factory.addStep(RemoveDirectory(
@@ -1478,8 +1479,8 @@ def get_builders():
                     prefix="builds/install/stage1")
     factory.addStep(Compile(
             name="stage1_build",
-            #locks=[centos6_lock.access('counting')],
-            command=["make", "-j77", "-l80", "-k"]))
+            locks           = [sled4_build_lock.access('exclusive')],
+            command=["make", "-j77", "-k"]))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_llvm',
             command         = ["make", "-j77", "-k", "check-llvm"],
@@ -2098,8 +2099,7 @@ def get_builders():
 
 
     # ninja-clang-x64-mingw64-RA
-    #gccpath = "C:/mingw-builds/x64-4.8.1-posix-seh-rev5/mingw64/bin"
-    gccpath = "C:/mingw-w64/x86_64-4.8.5-posix-seh-rt_v4-rev0/mingw64/bin"
+    gccpath = "C:/mingw-builds/x64-4.8.1-posix-seh-rev5/mingw64/bin"
     factory = BuildFactory()
     AddGitWin7(factory)
     BlobPre(factory)
@@ -2184,7 +2184,7 @@ def get_builders():
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_BUILD_EXAMPLES="ON",
         CLANG_BUILD_EXAMPLES="ON",
-        CMAKE_LIBRARY_PATH="C:/mingw-w64/x86_64-4.9.3-posix-seh-rt_v4-rev1/mingw64/x86_64-w64-mingw32/lib",
+        CMAKE_LIBRARY_PATH="C:/mingw-w64/x86_64-5.4.0-posix-seh-rt_v5-rev0/mingw64/x86_64-w64-mingw32/lib",
         DL_LIBRARY_PATH="OFF",
         doStepIf=Makefile_not_ready)
 
@@ -2236,7 +2236,7 @@ def get_builders():
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
             'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            'PATH': r'C:\mingw-w64\x86_64-4.9.3-posix-seh-rt_v4-rev1\mingw64\bin;${PATH};C:\Program Files (x86)\CMake-3.4\bin',
+            'PATH': r'C:\mingw-w64\x86_64-5.4.0-posix-seh-rt_v5-rev0\mingw64\bin;${PATH};C:\Program Files (x86)\CMake-3.4\bin',
             },
         factory=factory)
 
