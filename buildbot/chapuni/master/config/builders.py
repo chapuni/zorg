@@ -1654,19 +1654,19 @@ def get_builders():
     Compare23(
         factory,
         )
-    yield BuilderConfig(
-        name="clang-3stage-i686-linux",
-        category="Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
-        env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
-            'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="clang-3stage-i686-linux",
+    #     category="Linux",
+    #     slavenames=["lab-sled4"],
+    #     mergeRequests=True,
+    #     env={
+    #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # Cygwin on CentOS6
     factory = BuildFactory()
@@ -1744,18 +1744,18 @@ def get_builders():
 
     BlobPost(factory)
 
-    yield BuilderConfig(
-        name="clang-i686-cygwin-RA-centos6",
-        category="Linux cross",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
-        env={
-            'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="clang-i686-cygwin-RA-centos6",
+    #     category="Linux cross",
+    #     slavenames=["lab-sled4"],
+    #     mergeRequests=True,
+    #     env={
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # Cygwin(3stage)
     factory = BuildFactory()
@@ -1878,18 +1878,18 @@ def get_builders():
         factory,
         #warn=False,
         )
-    yield BuilderConfig(
-        name="clang-3stage-i686-cygwin",
-        category="Cygwin",
-        slavenames=["cygwin"],
-        mergeRequests=True,
-        env={
-            'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="clang-3stage-i686-cygwin",
+    #     category="Cygwin",
+    #     slavenames=["cygwin"],
+    #     mergeRequests=True,
+    #     env={
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # PS3
     factory = BuildFactory()
