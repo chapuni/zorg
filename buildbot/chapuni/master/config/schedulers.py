@@ -41,6 +41,27 @@ change_llvm_master = ChangeFilter(filter_fn = filter_cmake_llvm,
                                   #branch=['master'],
                                   )
 
+def filter_cmake_llvm_build(change):
+    l = Fautoconf(Tllvm(getattr(change, "files")))
+    if len(Tcmake(l)) > 0:
+        return True
+    return len(Fllvmtest(Fhtml(l))) > 0
+
+change_llvm_build_master = ChangeFilter(filter_fn = filter_cmake_llvm_build,
+                                  #branch=['master'],
+                                  )
+
+def filter_cmake_clang_build(change):
+    l = Fautoconf(getattr(change, "files"))
+    l = Tclang(l) + Tllvm(l)
+    if len(Tcmake(l)) > 0:
+        return True
+    return len(Fclangtest(Fllvmtest(Fhtml(l)))) > 0
+
+change_clang_build_master = ChangeFilter(filter_fn = filter_cmake_clang_build,
+                                  #branch=['master'],
+                                  )
+
 def filter_all(change):
     l = Fhtml(getattr(change, "files"))
     return len(Tclang(l) + Tllvm(l)) > 0
@@ -131,101 +152,226 @@ change_dragonegg_master = ChangeFilter(filter_fn = filter_cmake_dragonegg,
 # case, just kick off a 'runtests' build
 
 def get_schedulers():
-    llvm_linux = AnyBranchScheduler(
-        name="s_cmake-llvm-x86_64-linux",
-        change_filter = change_llvm_master,
-        #treeStableTimer=None,
+    llvm32RA = AnyBranchScheduler(
+        name="s_llvm-i686-linux-RA",
+        change_filter = change_llvm_build_master,
         treeStableTimer=2,
         builderNames=[
-            "cmake-llvm-x86_64-linux",
+            "llvm-i686-linux-RA",
             ])
-    yield llvm_linux
+    yield llvm32RA
+
+    clang32RA = AnyBranchScheduler(
+        name="s_clang-i686-linux-RA",
+        change_filter = change_clang_build_master,
+        treeStableTimer=2,
+        upstreams=[llvm32RA],
+        builderNames=[
+            "clang-i686-linux-RA",
+            ])
+    yield clang32RA
+
+    tools32RA = AnyBranchScheduler(
+        name="s_clang-tools-i686-linux-RA",
+        change_filter = change_cmake_llvmclang_build,
+        treeStableTimer=2,
+        upstreams=[llvm32RA, clang32RA],
+        builderNames=[
+            "clang-tools-i686-linux-RA",
+            ])
+    yield tools32RA
+
+    llvm64R = AnyBranchScheduler(
+        name="s_llvm-x86_64-linux-R",
+        change_filter = change_llvm_build_master,
+        treeStableTimer=2,
+        upstreams=[llvm32RA],
+        builderNames=[
+            "llvm-x86_64-linux-R",
+            ])
+    yield llvm64R
+
+    clang64R = AnyBranchScheduler(
+        name="s_clang-x86_64-linux-R",
+        change_filter = change_clang_build_master,
+        treeStableTimer=2,
+        upstreams=[llvm64R,clang32RA],
+        builderNames=[
+            "clang-x86_64-linux-R",
+            ])
+    yield clang64R
+
+    tools64R = AnyBranchScheduler(
+        name="s_clang-tools-x86_64-linux-R",
+        change_filter = change_cmake_llvmclang_build,
+        treeStableTimer=2,
+        upstreams=[llvm64R, clang64R, tools32RA],
+        builderNames=[
+            "clang-tools-x86_64-linux-R",
+            ])
+    yield tools64R
+
+    testllvm32RA = AnyBranchScheduler(
+        name="s_test-llvm-i686-linux-RA",
+        change_filter = change_llvm_master,
+        treeStableTimer=2,
+        upstreams=[llvm32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-llvm-i686-linux-RA",
+            ])
+    yield testllvm32RA
+
+    testclang32RA = AnyBranchScheduler(
+        name="s_test-clang-i686-linux-RA",
+        change_filter = change_clang_master,
+        treeStableTimer=2,
+        upstreams=[clang32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-clang-i686-linux-RA",
+            ])
+    yield testclang32RA
+
+    testtools32RA = AnyBranchScheduler(
+        name="s_test-clang-tools-i686-linux-RA",
+        change_filter = change_tools_master,
+        treeStableTimer=2,
+        upstreams=[tools32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-clang-tools-i686-linux-RA",
+            ])
+    yield testtools32RA
+
+    testllvmmsc64RA = AnyBranchScheduler(
+        name="s_test-llvm-msc-x64-on-i686-linux-RA",
+        change_filter = change_llvm_master,
+        treeStableTimer=2,
+        upstreams=[testllvm32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-llvm-msc-x64-on-i686-linux-RA",
+            ])
+    yield testllvmmsc64RA
+
+    testclangmsc64RA = AnyBranchScheduler(
+        name="s_test-clang-msc-x64-on-i686-linux-RA",
+        change_filter = change_clang_master,
+        treeStableTimer=2,
+        upstreams=[testclang32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-clang-msc-x64-on-i686-linux-RA",
+            ])
+    yield testclangmsc64RA
+
+    testtoolsmsc64RA = AnyBranchScheduler(
+        name="s_test-clang-tools-msc-x64-on-i686-linux-RA",
+        change_filter = change_tools_master,
+        treeStableTimer=2,
+        upstreams=[testtools32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-clang-tools-msc-x64-on-i686-linux-RA",
+            ])
+    yield testtoolsmsc64RA
+
+    testllvm64R = AnyBranchScheduler(
+        name="s_test-llvm-x86_64-linux-R",
+        change_filter = change_llvm_master,
+        treeStableTimer=2,
+        upstreams=[llvm64R,testllvm32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-llvm-x86_64-linux-R",
+            ])
+    yield testllvm64R
+
+    testclang64R = AnyBranchScheduler(
+        name="s_test-clang-x86_64-linux-R",
+        change_filter = change_clang_master,
+        treeStableTimer=2,
+        upstreams=[clang64R,testclang32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-clang-x86_64-linux-R",
+            ])
+    yield testclang64R
+
+    testtools64R = AnyBranchScheduler(
+        name="s_test-clang-tools-x86_64-linux-R",
+        change_filter = change_tools_master,
+        treeStableTimer=2,
+        upstreams=[tools64R, testtools32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-clang-tools-x86_64-linux-R",
+            ])
+    yield testtools64R
+
+    testllvmmsc32R = AnyBranchScheduler(
+        name="s_test-llvm-msc-x86-on-x86_64-linux-R",
+        change_filter = change_llvm_master,
+        treeStableTimer=2,
+        upstreams=[testllvm64R, testllvmmsc64RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-llvm-msc-x86-on-x86_64-linux-R",
+            ])
+    yield testllvmmsc32R
+
+    testclangmsc32R = AnyBranchScheduler(
+        name="s_test-clang-msc-x86-on-x86_64-linux-R",
+        change_filter = change_clang_master,
+        treeStableTimer=2,
+        upstreams=[testclang64R, testclangmsc64RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-clang-msc-x86-on-x86_64-linux-R",
+            ])
+    yield testclangmsc32R
+
+    testtoolsmsc32R = AnyBranchScheduler(
+        name="s_test-clang-tools-msc-x86-on-x86_64-linux-R",
+        change_filter = change_tools_master,
+        treeStableTimer=2,
+        upstreams=[testtools64R, testtoolsmsc64RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-clang-tools-msc-x86-on-x86_64-linux-R",
+            ])
+    yield testtoolsmsc32R
 
     lld_linux = AnyBranchScheduler(
         name="s_lld-x86_64-linux",
         change_filter = change_lld_master,
         #treeStableTimer=None,
         treeStableTimer=2,
-        upstreams=[llvm_linux],
+        upstreams=[llvm64R],
         waitAllUpstreams=False,
         builderNames=[
             "lld-x86_64-linux",
             ])
     yield lld_linux
 
-    clang_linux = AnyBranchScheduler(
-        name="s_cmake-clang-x86_64-linux",
-        change_filter = change_clang_master,
-        #treeStableTimer=None,
-        treeStableTimer=2,
-        upstreams=[llvm_linux],
-        waitAllUpstreams=False,
-        builderNames=[
-            "cmake-clang-x86_64-linux",
-            ])
-    yield clang_linux
-
-    tools_linux = AnyBranchScheduler(
-        name="s_cmake-clang-tools-x86_64-linux",
-        change_filter = change_tools_master,
-        #treeStableTimer=None,
-        treeStableTimer=2,
-        upstreams=[llvm_linux, clang_linux],
-        waitAllUpstreams=False,
-        builderNames=[
-            "cmake-clang-tools-x86_64-linux",
-            ])
-    yield tools_linux
-
     mingw32_linux = AnyBranchScheduler(
         name="s_i686-mingw32-RA-on-linux",
-        change_filter = change_cmake_llvmclang,
+        change_filter = change_cmake_llvmclang_build,
         #treeStableTimer=None,
         treeStableTimer=2,
-        upstreams=[llvm_linux, clang_linux, tools_linux],
+        upstreams=[llvm32RA, clang32RA, tools32RA],
         #waitAllUpstreams=False,
         builderNames=[
             "i686-mingw32-RA-on-linux",
             ])
     yield mingw32_linux
 
-    # dragonegg_linux = AnyBranchScheduler(
-    #     name="s_cmake-dragonegg-x86_64-linux",
-    #     change_filter = change_dragonegg_master,
-    #     #treeStableTimer=None,
-    #     treeStableTimer=10 * 60,
-    #     upstreams=[llvm_linux],
-    #     waitAllUpstreams=False,
-    #     builderNames=[
-    #         "cmake-dragonegg-x86_64-linux",
-    #         ])
-    # yield dragonegg_linux
-
-    # cyg_centos6 = AnyBranchScheduler(
-    #     name="s_clang-i686-cygwin-RA-centos6",
-    #     change_filter = change_autoconf_llvmclang,
-    #     treeStableTimer=30,
-    #     upstreams=[llvm_linux, clang_linux],
-    #     builderNames=[
-    #         "clang-i686-cygwin-RA-centos6",
-    #         ])
-    # yield cyg_centos6
-
-    x64_centos6 = AnyBranchScheduler(
-        name="s_ninja-x64-msvc-RA-centos6",
-        change_filter = change_cmake_llvmclang,
-        treeStableTimer=10,
-        upstreams=[llvm_linux, clang_linux, tools_linux],
-        builderNames=[
-            "ninja-x64-msvc-RA-centos6",
-            ])
-    yield x64_centos6
-
     llvmclang_msc19 = AnyBranchScheduler(
         name="s_ninja-clang-i686-msc19-R",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=1 * 60,
-        upstreams=[x64_centos6, mingw32_linux],
+        upstreams=[testllvmmsc32R, testclangmsc32R, testtoolsmsc32R, mingw32_linux],
         builderNames=[
             "ninja-clang-i686-msc19-R",
             ])
@@ -255,102 +401,50 @@ def get_schedulers():
         name="s_msbuild-llvmclang-x64-msc19-DA",
         change_filter = change_cmake_llvmclang,
         treeStableTimer=30 * 60,
-        upstreams=[llvmclang_msc19,llvmclang_mingw64,x64_centos6],
+        upstreams=[llvmclang_msc19,llvmclang_mingw64,testllvmmsc64RA,testclangmsc64RA,testtoolsmsc64RA],
         builderNames=[
             "msbuild-llvmclang-x64-msc19-DA",
             ])
     yield llvmclang_msc19_x64
 
-    # llvmclang_msc18_x64 = AnyBranchScheduler(
-    #     name="s_msbuild-llvmclang-x64-msc18-DA",
-    #     change_filter = change_cmake_llvmclang_release_38,
-    #     treeStableTimer=30 * 60,
-    #     upstreams=[llvmclang_msc18,llvmclang_mingw64,x64_centos6],
-    #     builderNames=[
-    #         "msbuild-llvmclang-x64-msc18-DA",
-    #         ])
-    # yield llvmclang_msc18_x64
-
-    # llvmclang_msc16_x64 = AnyBranchScheduler(
-    #     name="s_cmake-clang-x64-msc16-R",
-    #     change_filter = change_cmake_llvmclang,
-    #     treeStableTimer=15 * 60,
-    #     upstreams=[llvmclang_msc17],
-    #     builderNames=[
-    #         "cmake-clang-x64-msc16-R",
-    #         ])
-    # yield llvmclang_msc16_x64
-
-    # clang_3stage_i686_linux = AnyBranchScheduler(
-    #     name="s_clang-3stage-i686-linux",
-    #     change_filter = change_llvmclang_release_38,
-    #     treeStableTimer=20 * 60,
-    #     upstreams=[llvm_linux, clang_linux,cyg_centos6],
-    #     builderNames=[
-    #         "clang-3stage-i686-linux",
-    #         ])
-    # yield clang_3stage_i686_linux
-
     clang_3stage_linux = AnyBranchScheduler(
         name="s_clang-3stage-x86_64-linux",
         change_filter = change_llvmclang,
         treeStableTimer=25 * 60,
-        upstreams=[llvm_linux, clang_linux],
+        upstreams=[testllvm64R,testclang64R],
         builderNames=[
             "clang-3stage-x86_64-linux",
             ])
     yield clang_3stage_linux
 
-    # yield AnyBranchScheduler(
-    #     name="s_clang-i686-msys",
-    #     change_filter = change_autoconf_llvmclang,
-    #     treeStableTimer=60 * 60,
-    #     upstreams=[
-    #         cyg_centos6, llvmclang_mingw64,
-    #         ],
-    #     builderNames=[
-    #         "clang-i686-msys",
-    #         ])
-
-    # yield AnyBranchScheduler(
-    #     name="s_clang-3stage-i686-cygwin",
-    #     change_filter = change_autoconf_llvmclang,
-    #     treeStableTimer=30 * 60,
-    #     upstreams=[
-    #         cyg_centos6,
-    #         llvmclang_mingw64,
-    #         clang_3stage_i686_linux,
-    #         ],
-    #     builderNames=[
-    #         "clang-3stage-i686-cygwin",
-    #         ])
-
     yield ForceScheduler(
         name="force",
         builderNames=[
-            "cmake-clang-x86_64-linux",
-            "cmake-clang-tools-x86_64-linux",
-#            "cmake-dragonegg-x86_64-linux",
-            "ninja-x64-msvc-RA-centos6",
-#            "clang-3stage-i686-linux",
-#            "cmake-clang-i686-mingw32",
             "ninja-clang-x64-mingw64-RA",
             "ninja-clang-i686-msc19-R",
-#            "ninja-clang-i686-msc18-R",
-#            "ninja-clang-i686-msc17-R",
             "msbuild-llvmclang-x64-msc19-DA",
-#            "msbuild-llvmclang-x64-msc18-DA",
-#            "msbuild-llvmclang-x64-msc17-DA",
-#            "cmake-clang-x64-msc16-R",
-#            "cmake-clang-i686-msvc10",
-            "cmake-llvm-x86_64-linux",
             "clang-3stage-x86_64-linux",
             "i686-mingw32-RA-on-linux",
-#            "clang-ppc-linux",
-#            "clang-3stage-i686-cygwin",
-#            "clang-i686-cygwin-RA-centos6",
-#            "clang-i686-msys",
             "lld-x86_64-linux",
+
+            "llvm-i686-linux-RA",
+            "clang-i686-linux-RA",
+            "clang-tools-i686-linux-RA",
+            "test-llvm-i686-linux-RA",
+            "test-clang-i686-linux-RA",
+            "test-clang-tools-i686-linux-RA",
+            "test-llvm-msc-x64-on-i686-linux-RA",
+            "test-clang-msc-x64-on-i686-linux-RA",
+            "test-clang-tools-msc-x64-on-i686-linux-RA",
+            "llvm-x86_64-linux-R",
+            "clang-x86_64-linux-R",
+            "clang-tools-x86_64-linux-R",
+            "test-llvm-x86_64-linux-R",
+            "test-clang-x86_64-linux-R",
+            "test-clang-tools-x86_64-linux-R",
+            "test-llvm-msc-x86-on-x86_64-linux-R",
+            "test-clang-msc-x86-on-x86_64-linux-R",
+            "test-clang-tools-msc-x86-on-x86_64-linux-R",
             ],
 
         # will generate a combo box

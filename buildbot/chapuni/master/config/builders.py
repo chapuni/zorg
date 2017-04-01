@@ -833,7 +833,407 @@ def BlobPost(factory):
             timeout=3 * 3600,
             workdir="."))
 
+def BuildNinja(
+    factory,
+    buildLLVM=False,
+    buildClang=False,
+    buildExtra=False,
+    buildGold=False,
+    testLLVM=False,
+    testClang=False,
+    testExtra=False,
+    doClean=False,
+    i686=False,
+    asserts=True,
+    target=None):
+
+    AddGitSled4(factory)
+
+    BlobPre(factory)
+    if doClean:
+        AddCleanBin(factory)
+
+    PatchLLVMClang(factory, "llvmclang.diff")
+    CheckMakefile(factory, makefile="build.ninja")
+    cmake_args={
+        'buildClang': False,
+        }
+    if i686:
+        cmake_args['LLVM_BUILD_32_BITS']="ON"
+        if target is None:
+            target="i686-unknown-linux-gnu"
+
+    if target is not None:
+        cmake_args["LLVM_DEFAULT_TARGET_TRIPLE"]=target
+
+    if asserts:
+        cmake_args["LLVM_ENABLE_ASSERTIONS"]="ON"
+    else:
+        cmake_args["LLVM_ENABLE_ASSERTIONS"]="OFF"
+
+    if buildLLVM or testLLVM:
+        cmake_args['LLVM_BUILD_EXAMPLES']="ON"
+    else:
+        cmake_args.update({
+                'LLVM_BUILD_EXAMPLES':  "OFF",
+                'LLVM_BUILD_RUNTIME':   "OFF",
+                'LLVM_BUILD_TESTS':     "OFF",
+                'LLVM_BUILD_TOOLS':     "OFF",
+                })
+
+    if buildGold:
+        cmake_args['LLVM_BINUTILS_INCDIR']="/usr/include"
+
+    if buildClang or testClang:
+        cmake_args.update({
+                'buildClang': True,
+                'CLANG_BUILD_EXAMPLES': "ON",
+                })
+
+    if buildExtra or testExtra:
+        cmake_args.update({
+                'buildClang': True,
+                'LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR': "../llvm-project/clang-tools-extra",
+                })
+
+    if testLLVM or testClang or testExtra:
+        cmake_args['LLVM_LIT_ARGS']="-v"
+    else:
+        cmake_args['LLVM_LIT_ARGS']="--show-suites --no-execute -q"
+
+    AddCMakeCentOS6Ninja(
+        factory,
+        CMAKE_C_COMPILER="/home/bb/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        doStepIf=Makefile_not_ready,
+        **cmake_args)
+
+    # For ccache
+    factory.addStep(Compile(
+            name            = 'recheck_cmake',
+            command         = ["ninja", "build.ninja"],
+            ))
+    factory.addStep(Compile(
+            name            = 'Tweak build.ninja',
+            command         = [
+                "sed", "-i", "-r",
+                r's=(-I|_COMPILER\S* )/home/bb/\w[^/]*/llvm-project=\1../llvm-project=g',
+                "build.ninja",
+                ],
+            ))
+
+    if buildLLVM or buildClang:
+        factory.addStep(Compile(
+                name            = 'build_all',
+                command         = ["ninja"],
+                locks           = [sled4_build_lock.access('exclusive')],
+                description     = ["building", "all"],
+                descriptionDone = ["built",    "all"]))
+
+    if buildExtra:
+        factory.addStep(LitTestCommand(
+                name            = 'build_clang_tools',
+                command         = ["ninja", "check-clang-tools"],
+                locks           = [sled4_build_lock.access('exclusive')],
+                description     = ["building", "tools"],
+                descriptionDone = ["built",    "tools"],
+                ))
+
+    if testLLVM:
+        factory.addStep(LitTestCommand(
+                name            = 'test_llvm',
+                command         = ["ninja", "check-llvm"],
+                description     = ["testing", "llvm"],
+                descriptionDone = ["test",    "llvm"],
+                timeout=300,
+                ))
+
+    if testClang:
+        factory.addStep(LitTestCommand(
+                name            = 'test_clang',
+                command         = ["ninja", "check-clang"],
+                description     = ["testing", "clang"],
+                descriptionDone = ["test",    "clang"],
+                timeout=300,
+                ))
+
+    if testExtra:
+        factory.addStep(LitTestCommand(
+                name            = 'test_clang_tools',
+                command         = ["ninja", "check-clang-tools"],
+                description     = ["testing", "tools"],
+                descriptionDone = ["test",    "tools"],
+                timeout=300,
+                ))
+    BlobPost(factory)
+
 def get_builders():
+    common_env={
+        'LIT_PRESERVES_TMP': '1',
+        'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+        'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+        'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+        }
+
+    # i686-RA Builds
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        buildLLVM=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="llvm-i686-linux-RA",
+        category="Linux fast",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        buildClang=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="clang-i686-linux-RA",
+        category="Linux fast",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        buildExtra=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="clang-tools-i686-linux-RA",
+        category="Linux fast",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    # i686-RA tests
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        testLLVM=True,
+        doClean=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="test-llvm-i686-linux-RA",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        testClang=True,
+        doClean=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="test-clang-i686-linux-RA",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        testExtra=True,
+        doClean=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="test-clang-tools-i686-linux-RA",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        target="x86_64-pc-win32",
+        testLLVM=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="test-llvm-msc-x64-on-i686-linux-RA",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        target="x86_64-pc-win32",
+        testClang=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="test-clang-msc-x64-on-i686-linux-RA",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        target="x86_64-pc-win32",
+        testExtra=True,
+        asserts=True,
+        i686=True)
+    yield BuilderConfig(
+        name="test-clang-tools-msc-x64-on-i686-linux-RA",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    # x86_64-R Builds
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        buildLLVM=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="llvm-x86_64-linux-R",
+        category="Linux fast",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        buildClang=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="clang-x86_64-linux-R",
+        category="Linux fast",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        buildExtra=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="clang-tools-x86_64-linux-R",
+        category="Linux fast",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    # x86_64-R Tests
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        testLLVM=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="test-llvm-x86_64-linux-R",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        testClang=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="test-clang-x86_64-linux-R",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        testExtra=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="test-clang-tools-x86_64-linux-R",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        target="i686-pc-win32",
+        testLLVM=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="test-llvm-msc-x86-on-x86_64-linux-R",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        target="i686-pc-win32",
+        testClang=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="test-clang-msc-x86-on-x86_64-linux-R",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+    factory = BuildFactory()
+    BuildNinja(
+        factory,
+        target="i686-pc-win32",
+        testExtra=True,
+        asserts=False)
+    yield BuilderConfig(
+        name="test-clang-tools-msc-x86-on-x86_64-linux-R",
+        category="Tests on Linux",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
+
+
+
+
 
     # CentOS5(llvm-x86)
     factory = BuildFactory()
@@ -915,21 +1315,21 @@ def get_builders():
 
     BlobPost(factory)
 
-    yield BuilderConfig(
-        name="cmake-llvm-x86_64-linux",
-        category="Linux fast",
-        slavenames=["lab-sled4"],
-        #mergeRequests=False,
-        mergeRequests=True,
-        #locks=[centos6_lock.access('counting')],
-        env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
-            'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="cmake-llvm-x86_64-linux",
+    #     category="Linux fast",
+    #     slavenames=["lab-sled4"],
+    #     #mergeRequests=False,
+    #     mergeRequests=True,
+    #     #locks=[centos6_lock.access('counting')],
+    #     env={
+    #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # CentOS5(clang only)
     factory = BuildFactory()
@@ -1016,20 +1416,20 @@ def get_builders():
             descriptionDone = ["built",    "all"]))
 
     BlobPost(factory)
-    yield BuilderConfig(
-        name="cmake-clang-x86_64-linux",
-        category="Linux fast",
-        slavenames=["lab-sled4"],
-        #mergeRequests=False,
-        mergeRequests=True,
-        env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
-            'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="cmake-clang-x86_64-linux",
+    #     category="Linux fast",
+    #     slavenames=["lab-sled4"],
+    #     #mergeRequests=False,
+    #     mergeRequests=True,
+    #     env={
+    #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # lld
     factory = BuildFactory()
@@ -1162,20 +1562,20 @@ def get_builders():
             ))
 
     BlobPost(factory)
-    yield BuilderConfig(
-        name="cmake-clang-tools-x86_64-linux",
-        category="Linux fast",
-        slavenames=["lab-sled4"],
-        #mergeRequests=False,
-        mergeRequests=True,
-        env={
-            'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
-            'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="cmake-clang-tools-x86_64-linux",
+    #     category="Linux fast",
+    #     slavenames=["lab-sled4"],
+    #     #mergeRequests=False,
+    #     mergeRequests=True,
+    #     env={
+    #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # dragonegg
     factory = BuildFactory()
@@ -1310,19 +1710,19 @@ def get_builders():
             descriptionDone = ["built",    "all"]))
 
     BlobPost(factory)
-    yield BuilderConfig(
-        name="ninja-x64-msvc-RA-centos6",
-        category="Linux cross",
-        slavenames=["lab-sled4"],
-        #mergeRequests=False,
-        mergeRequests=True,
-        env={
-            'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="ninja-x64-msvc-RA-centos6",
+    #     category="Linux cross",
+    #     slavenames=["lab-sled4"],
+    #     #mergeRequests=False,
+    #     mergeRequests=True,
+    #     env={
+    #         'LIT_PRESERVES_TMP': '1',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # i686-mingw32 on linux
     factory = BuildFactory()
