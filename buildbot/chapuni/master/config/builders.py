@@ -856,6 +856,9 @@ def BuildNinja(
     PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     cmake_args={
+        'CMAKE_EXE_LINKER_FLAGS'   : '-fuse-ld=gold',
+        'CMAKE_MODULE_LINKER_FLAGS': '-fuse-ld=gold',
+        'CMAKE_SHARED_LINKER_FLAGS': '-fuse-ld=gold',
         'buildClang': False,
         }
     if i686:
