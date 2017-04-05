@@ -861,6 +861,7 @@ def BuildNinja(
         'CMAKE_SHARED_LINKER_FLAGS': '-fuse-ld=gold',
         'buildClang': False,
         }
+    build_all_targets = ["all"]
     if i686:
         cmake_args['LLVM_BUILD_32_BITS']="ON"
         if target is None:
@@ -876,6 +877,7 @@ def BuildNinja(
 
     if buildLLVM or testLLVM:
         cmake_args['LLVM_BUILD_EXAMPLES']="ON"
+        cmake_args['LLVM_BUILD_TESTS']   ="ON"
     else:
         cmake_args.update({
                 'LLVM_BUILD_EXAMPLES':  "OFF",
@@ -892,6 +894,7 @@ def BuildNinja(
                 'buildClang': True,
                 'CLANG_BUILD_EXAMPLES': "ON",
                 })
+        build_all_targets += ["ClangUnitTests"]
 
     if buildExtra or testExtra:
         cmake_args.update({
@@ -928,7 +931,7 @@ def BuildNinja(
     if buildLLVM or buildClang:
         factory.addStep(Compile(
                 name            = 'build_all',
-                command         = ["ninja"],
+                command         = ["ninja"] + build_all_targets,
                 locks           = [sled4_build_lock.access('exclusive')],
                 description     = ["building", "all"],
                 descriptionDone = ["built",    "all"]))
