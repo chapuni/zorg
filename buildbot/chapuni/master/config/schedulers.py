@@ -18,6 +18,7 @@ def Tcmake(l):
 def Tllvmlib(l):
     return filter_t(l, r'^llvm/(include|lib|tools|utils)/')
 def Fllvmtest(l): return filter_f(l, r'^llvm/test/.+/')
+def Flldtest(l): return filter_f(l, r'^lld/test/.+/')
 def Fclangtest(l): return filter_f(l, r'^clang/test/.+/')
 def Ftoolstest(l): return filter_f(l, r'^clang-tools-extra/test/.+/')
 def Fhtml(l): return filter_f(l, r'\.(TXT|html|rst)(\.\w)?$')
@@ -104,6 +105,17 @@ def filter_cmake_llvmclang_build(change):
 
 change_cmake_llvmclang_build = ChangeFilter(filter_fn = filter_cmake_llvmclang_build)
 
+def filter_cmake_lld_build(change):
+    l = Fautoconf(getattr(change, "files"))
+    l = Tlld(l) + Tllvm(l)
+    if len(Tcmake(l)) > 0:
+        return True
+    return len(Flldtest(Fllvmtest(Fhtml(l)))) > 0
+
+change_lld_build_master = ChangeFilter(filter_fn = filter_cmake_lld_build,
+                                   #branch=['master'],
+                                   )
+
 def filter_cmake_lld(change):
     l = Fautoconf(getattr(change, "files"))
     l = Tlld(l) + Tllvm(l)
@@ -181,6 +193,16 @@ def get_schedulers():
             ])
     yield tools32RA
 
+    lld32RA = AnyBranchScheduler(
+        name="s_lld-i686-linux-RA",
+        change_filter = change_lld_build_master,
+        treeStableTimer=2,
+        upstreams=[llvm32RA],
+        builderNames=[
+            "lld-i686-linux-RA",
+            ])
+    yield lld32RA
+
     llvm64R = AnyBranchScheduler(
         name="s_llvm-x86_64-linux-R",
         change_filter = change_llvm_build_master,
@@ -210,6 +232,16 @@ def get_schedulers():
             "clang-tools-x86_64-linux-R",
             ])
     yield tools64R
+
+    lld64R = AnyBranchScheduler(
+        name="s_lld-x86_64-linux-R",
+        change_filter = change_lld_build_master,
+        treeStableTimer=2,
+        upstreams=[llvm64R, lld32RA],
+        builderNames=[
+            "lld-x86_64-linux-R",
+            ])
+    yield lld64R
 
     testllvm32RA = AnyBranchScheduler(
         name="s_test-llvm-i686-linux-RA",
@@ -243,6 +275,17 @@ def get_schedulers():
             "test-clang-tools-i686-linux-RA",
             ])
     yield testtools32RA
+
+    testlld32RA = AnyBranchScheduler(
+        name="s_test-lld-i686-linux-RA",
+        change_filter = change_lld_master,
+        treeStableTimer=2,
+        upstreams=[lld32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-lld-i686-linux-RA",
+            ])
+    yield testlld32RA
 
     testllvmmsc64RA = AnyBranchScheduler(
         name="s_test-llvm-msc-x64-on-i686-linux-RA",
@@ -310,6 +353,17 @@ def get_schedulers():
             ])
     yield testtools64R
 
+    testlld64R = AnyBranchScheduler(
+        name="s_test-lld-x86_64-linux-R",
+        change_filter = change_lld_master,
+        treeStableTimer=2,
+        upstreams=[lld64R, testlld32RA],
+        waitAllUpstreams=False,
+        builderNames=[
+            "test-lld-x86_64-linux-R",
+            ])
+    yield testlld64R
+
     testllvmmsc32R = AnyBranchScheduler(
         name="s_test-llvm-msc-x86-on-x86_64-linux-R",
         change_filter = change_llvm_master,
@@ -342,18 +396,6 @@ def get_schedulers():
             "test-clang-tools-msc-x86-on-x86_64-linux-R",
             ])
     yield testtoolsmsc32R
-
-    lld_linux = AnyBranchScheduler(
-        name="s_lld-x86_64-linux",
-        change_filter = change_lld_master,
-        #treeStableTimer=None,
-        treeStableTimer=2,
-        upstreams=[llvm64R],
-        waitAllUpstreams=False,
-        builderNames=[
-            "lld-x86_64-linux",
-            ])
-    yield lld_linux
 
     mingw32_linux = AnyBranchScheduler(
         name="s_i686-mingw32-RA-on-linux",
@@ -425,23 +467,26 @@ def get_schedulers():
             "msbuild-llvmclang-x64-msc19-DA",
             "clang-3stage-x86_64-linux",
             "i686-mingw32-RA-on-linux",
-            "lld-x86_64-linux",
 
             "llvm-i686-linux-RA",
             "clang-i686-linux-RA",
             "clang-tools-i686-linux-RA",
+            "lld-i686-linux-RA",
             "test-llvm-i686-linux-RA",
             "test-clang-i686-linux-RA",
             "test-clang-tools-i686-linux-RA",
+            "test-lld-i686-linux-RA",
             "test-llvm-msc-x64-on-i686-linux-RA",
             "test-clang-msc-x64-on-i686-linux-RA",
             "test-clang-tools-msc-x64-on-i686-linux-RA",
             "llvm-x86_64-linux-R",
             "clang-x86_64-linux-R",
             "clang-tools-x86_64-linux-R",
+            "lld-x86_64-linux-R",
             "test-llvm-x86_64-linux-R",
             "test-clang-x86_64-linux-R",
             "test-clang-tools-x86_64-linux-R",
+            "test-lld-x86_64-linux-R",
             "test-llvm-msc-x86-on-x86_64-linux-R",
             "test-clang-msc-x86-on-x86_64-linux-R",
             "test-clang-tools-msc-x86-on-x86_64-linux-R",
