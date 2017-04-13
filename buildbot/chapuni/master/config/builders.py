@@ -2671,7 +2671,7 @@ def get_builders():
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_BUILD_EXAMPLES="ON",
         CLANG_BUILD_EXAMPLES="ON",
-        CMAKE_LIBRARY_PATH="C:/mingw-w64/x86_64-5.4.0-posix-seh-rt_v5-rev0/mingw64/x86_64-w64-mingw32/lib",
+        CMAKE_LIBRARY_PATH="C:/mingw-w64/x86_64-4.8.5-posix-seh-rt_v4-rev0/mingw64/x86_64-w64-mingw32/lib",
         DL_LIBRARY_PATH="OFF",
         doStepIf=Makefile_not_ready)
 
@@ -2723,7 +2723,7 @@ def get_builders():
             'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
             'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
             'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            'PATH': r'C:\mingw-w64\x86_64-5.4.0-posix-seh-rt_v5-rev0\mingw64\bin;${PATH};C:\Program Files (x86)\CMake-3.4\bin',
+            'PATH': r'C:\mingw-w64\x86_64-4.8.5-posix-seh-rt_v4-rev0\mingw64\bin;${PATH};C:\Program Files (x86)\CMake-3.4\bin',
             },
         factory=factory)
 
