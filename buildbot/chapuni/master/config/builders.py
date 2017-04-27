@@ -1134,7 +1134,7 @@ def get_builders():
         i686=True)
     yield BuilderConfig(
         name="test-llvm-msc-x64-on-i686-linux-RA",
-        category="Tests on Linux",
+        category="Tests msc on Linux",
         slavenames=["lab-sled4"],
         mergeRequests=True,
         env=common_env,
@@ -1149,7 +1149,7 @@ def get_builders():
         i686=True)
     yield BuilderConfig(
         name="test-clang-msc-x64-on-i686-linux-RA",
-        category="Tests on Linux",
+        category="Tests msc on Linux",
         slavenames=["lab-sled4"],
         mergeRequests=True,
         env=common_env,
@@ -1164,7 +1164,7 @@ def get_builders():
         i686=True)
     yield BuilderConfig(
         name="test-clang-tools-msc-x64-on-i686-linux-RA",
-        category="Tests on Linux",
+        category="Tests msc on Linux",
         slavenames=["lab-sled4"],
         mergeRequests=True,
         env=common_env,
@@ -1284,7 +1284,7 @@ def get_builders():
         asserts=False)
     yield BuilderConfig(
         name="test-llvm-msc-x86-on-x86_64-linux-R",
-        category="Tests on Linux",
+        category="Tests msc on Linux",
         slavenames=["lab-sled4"],
         mergeRequests=True,
         env=common_env,
@@ -1298,7 +1298,7 @@ def get_builders():
         asserts=False)
     yield BuilderConfig(
         name="test-clang-msc-x86-on-x86_64-linux-R",
-        category="Tests on Linux",
+        category="Tests msc on Linux",
         slavenames=["lab-sled4"],
         mergeRequests=True,
         env=common_env,
@@ -1312,7 +1312,7 @@ def get_builders():
         asserts=False)
     yield BuilderConfig(
         name="test-clang-tools-msc-x86-on-x86_64-linux-R",
-        category="Tests on Linux",
+        category="Tests msc on Linux",
         slavenames=["lab-sled4"],
         mergeRequests=True,
         env=common_env,
@@ -2021,7 +2021,7 @@ def get_builders():
         )
     yield BuilderConfig(
         name="clang-3stage-x86_64-linux",
-        category="Linux",
+        category="Bootstrap",
         slavenames=["lab-sled4"],
         mergeRequests=True,
         env={
