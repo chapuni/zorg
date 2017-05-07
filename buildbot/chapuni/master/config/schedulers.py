@@ -452,7 +452,7 @@ def get_schedulers():
     clang_3stage_linux = AnyBranchScheduler(
         name="s_clang-3stage-x86_64-linux",
         change_filter = change_llvmclang,
-        treeStableTimer=25 * 60,
+        treeStableTimer=60 * 60,
         upstreams=[testllvm64R,testclang64R],
         builderNames=[
             "clang-3stage-x86_64-linux",
