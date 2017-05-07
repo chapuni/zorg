@@ -172,8 +172,8 @@ def AddGitSled4(factory):
         [sled4_git_lock.access('counting')])
     AddGitLLVMTree(
         factory,
-        #'ssh://bb@t.pgr.jp:19922/var/cache/llvm-project-tree.git',
-        '/home/tnakamura/llvm/llvm-project/',
+        'ssh://bb@t.pgr.jp:19922/var/cache/llvm-project-tree.git',
+        #'/home/tnakamura/llvm/llvm-project/',
         '/home/bb/llvm-project.git')
 
 def AddGitSled3(factory):
