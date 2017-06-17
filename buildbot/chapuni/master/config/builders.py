@@ -198,13 +198,14 @@ def AddGitWin7(factory):
 
 def AddCMake(factory, G,
              source="../llvm-project/llvm",
+             cmake="cmake",
              prefix="install",
              buildClang=True,
              doStepIf=True,
              workdir="build",
              **kwargs):
 
-    cmd = ["cmake", "-G"+G]
+    cmd = [cmake, "-G"+G]
     cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
     cmd.append("-DLLVM_BUILD_TESTS=ON")
     if buildClang:
@@ -1822,6 +1823,7 @@ def get_builders():
     AddCMakeCentOS6Ninja(
         factory,
         source="../../llvm-project/llvm",
+        cmake="cmake-3.9",
         LLVM_ENABLE_ASSERTIONS="ON",
         CMAKE_C_COMPILER="/home/bb/bin/gcc",
         CMAKE_CXX_COMPILER="/home/bb/bin/g++",
@@ -1842,6 +1844,7 @@ def get_builders():
         factory,
         source="../../llvm-project/llvm",
         prefix="builds/install",
+        cmake="cmake-3.9",
         LLVM_ENABLE_ASSERTIONS="ON",
         BUILD_SHARED_LIBS="ON",
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
@@ -1863,7 +1866,7 @@ def get_builders():
         )
     factory.addStep(Compile(
             name            = 'build_llvmclang',
-            #locks           = [centos6_lock.access('counting')],
+            locks           = [sled4_build_lock.access('exclusive')],
             command         = ["ninja"],
             description     = ["building", "llvmclang"],
             descriptionDone = ["built",    "llvmclang"],
