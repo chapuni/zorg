@@ -3164,6 +3164,22 @@ def get_builders():
                 ],
             workdir=wd,
             warnOnWarnings = True,
+            flunkOnFailure=False,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "test/check-llvm.vcxproj"]))
+    factory.addStep(Compile(
+            name="build_llvm",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -3270,6 +3286,23 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            flunkOnFailure=False,
+            warnOnWarnings = True,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "tools/extra/test/check-clang-tools.vcxproj"]))
+
+    factory.addStep(Compile(
+            name="build_clang_tools",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
             warnOnWarnings = True,
             command=[
                 msbuild,
@@ -3285,6 +3318,22 @@ def get_builders():
     # BlobAdd(factory, [
     #         wd+"/tools/extra",
     #         ])
+    factory.addStep(Compile(
+            name="build_clang",
+            timeout=3600,
+            locks = [
+                sled3_glock.access('exclusive'),
+                sled3_lock.access('exclusive'),
+                ],
+            workdir=wd,
+            flunkOnFailure=False,
+            warnOnWarnings = True,
+            command=[
+                msbuild,
+                "-m:8",
+                "-v:m",
+                "-p:Configuration=Debug",
+                "test/check-clang.vcxproj"]))
     factory.addStep(Compile(
             name="build_clang",
             timeout=3600,
