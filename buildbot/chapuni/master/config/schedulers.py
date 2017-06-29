@@ -13,6 +13,8 @@ def Tlld(l): return filter_t(l, r'^lld/')
 def Tclang(l): return filter_t(l, r'^clang/')
 def Tclang_extra(l): return filter_t(l, r'^clang-tools-extra/')
 def Tdragonegg(l): return filter_t(l, r'^dragonegg/')
+def Tlibcxx(l): return filter_t(l, r'^libcxx/')
+def Tlibcxxabi(l): return filter_t(l, r'^libcxxabi/')
 def Tcmake(l):
     return filter_t(l, r'^llvm/cmake/') + filter_t(l, r'/CMakeLists\.txt$')
 def Tllvmlib(l):
@@ -159,6 +161,12 @@ def filter_cmake_dragonegg(change):
 change_dragonegg_master = ChangeFilter(filter_fn = filter_cmake_dragonegg,
                                    #branch=['master'],
                                    )
+
+def filter_llvmclanglldcxxabi(change):
+    l = Fhtml(getattr(change, "files"))
+    return len(Tclang(l) + Tllvm(l) + Tlld(l) + Tlibcxx(l) + Tlibcxxabi(l)) > 0
+
+change_llvmclanglldcxxabi = ChangeFilter(filter_fn = filter_llvmclanglldcxxabi)
 
 # Configure the Schedulers, which decide how to react to incoming changes.  In this
 # case, just kick off a 'runtests' build
@@ -449,11 +457,21 @@ def get_schedulers():
     #         ])
     # yield llvmclang_msc19_x64
 
+    bootstrap_i686_linux = AnyBranchScheduler(
+        name="s_bootstrap-clang-libcxx-lld-i686-linux",
+        change_filter = change_llvmclanglldcxxabi,
+        treeStableTimer=15 * 60,
+        upstreams=[testllvm64R, testclang64R, testlld64R],
+        builderNames=[
+            "bootstrap-clang-libcxx-lld-i686-linux",
+            ])
+    yield bootstrap_i686_linux
+
     clang_3stage_linux = AnyBranchScheduler(
         name="s_clang-3stage-x86_64-linux",
         change_filter = change_llvmclang,
         treeStableTimer=60 * 60,
-        upstreams=[testllvm64R,testclang64R],
+        upstreams=[testllvm64R,testclang64R,bootstrap_i686_linux],
         builderNames=[
             "clang-3stage-x86_64-linux",
             ])
@@ -490,6 +508,8 @@ def get_schedulers():
             "test-llvm-msc-x86-on-x86_64-linux-R",
             "test-clang-msc-x86-on-x86_64-linux-R",
             "test-clang-tools-msc-x86-on-x86_64-linux-R",
+
+            "bootstrap-clang-libcxx-lld-i686-linux",
             ],
 
         # will generate a combo box

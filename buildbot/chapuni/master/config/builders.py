@@ -199,13 +199,17 @@ def AddGitWin7(factory):
 def AddCMake(factory, G,
              source="../llvm-project/llvm",
              cmake="cmake",
+             shlib=None,
              prefix="install",
              buildClang=True,
              doStepIf=True,
              workdir="build",
              **kwargs):
 
-    cmd = [cmake, "-G"+G]
+    cmd = []
+    if shlib is not None:
+        cmd += ["env", WithProperties("LD_RUN_PATH=%%(workdir)s/%s" % shlib)]
+    cmd += [cmake, "-G"+G]
     cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
     cmd.append("-DLLVM_BUILD_TESTS=ON")
     if buildClang:
@@ -539,6 +543,106 @@ def BuildStageNCMake(factory, n,
             command         = ["ninja", "install"],
             description     = ["installing", "llvmclang"],
             descriptionDone = ["installed",    "llvmclang"],
+            timeout=3600,
+            workdir=workdir))
+
+    factory.addStep(ShellCommand(
+            name="install_fix",
+            command=[
+                "mv", "-v",
+                tmpinst,
+                "%s/stage%d" % (instroot, n)],
+            workdir="."))
+    factory.addStep(ShellCommand(
+            name="builddir_fix",
+            command=[
+                "mv", "-v",
+                workdir,
+                "%s/stage%d" % (root, n)],
+            workdir="."))
+
+def BuildStageNlibcxx(factory, n,
+                 warn = True,
+                 root="builds"):
+    instroot="%s/install" % root
+    workdir="%s/stagen" % root
+    tools="%s/stage%d/bin" % (instroot, n - 1)
+    libs="%s/stage%d/lib" % (instroot, n - 1)
+    tmpinst="%s/stagen" % instroot
+    AddCMake(
+        factory, "Ninja",
+        cmake="cmake-3.9",
+        source="../../llvm-project/llvm",
+        buildClang=True,
+        LLVM_ENABLE_PROJECTS="libcxx;libcxxabi;lld",
+        CMAKE_BUILD_TYPE="Release",
+        LLVM_ENABLE_MODULES="ON",
+        LLVM_ENABLE_ASSERTIONS="OFF",
+        LIBCXX_ENABLE_ASSERTIONS="OFF",
+        LIBCXXABI_ENABLE_ASSERTIONS="OFF",
+        LLVM_BUILD_EXAMPLES="ON",
+        CLANG_DEFAULT_LINKER="lld",
+        CLANG_DEFAULT_CXX_STDLIB="libc++",
+        CLANG_BUILD_EXAMPLES="ON",
+        __CMAKE_C_COMPILER=WithProperties("-DCMAKE_C_COMPILER=%%(workdir)s/%s/clang" % tools),
+        __CMAKE_CXX_COMPILER=WithProperties("-DCMAKE_CXX_COMPILER=%%(workdir)s/%s/clang++" % tools),
+        CMAKE_C_FLAGS  ="",
+        LLVM_TARGETS_TO_BUILD="all",
+        LLVM_LIT_ARGS="-v",
+        PYTHON_EXECUTABLE="/usr/bin/python3",
+
+        # Tweaks
+        LLVM_FORCE_USE_OLD_TOOLCHAIN="ON",
+        __CMAKE_CXX_FLAGS=WithProperties("-Wno-unused-command-line-argument -stdlib=platform -isystem %%(workdir)s/%s/projects/libcxx/include -isystem %%(workdir)s/llvm-project/libcxx/include" % workdir),
+        __CMAKE_EXE_LINKER_FLAGS   =WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib -Wl,-rpath,%%(workdir)s/%s/lib" % (workdir, workdir)),
+        __CMAKE_MODULE_LINKER_FLAGS=WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib" % (workdir)),
+        __CMAKE_SHARED_LINKER_FLAGS=WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib" % (workdir)),
+
+        prefix="builds/install/stagen",
+        workdir=workdir)
+
+    factory.addStep(Compile(
+            name            = 'build_stage%d_libcxx' % n,
+            command         = [
+                "ninja", "cxx", "cxxabi_shared",
+                ],
+            description     = ["building", "stage%d_libcxx" % n],
+            descriptionDone = ["built",    "stage%d_libcxx" % n],
+            warnOnWarnings = warn,
+            timeout=300,
+            workdir=workdir))
+
+    factory.addStep(Compile(
+            name            = 'build_stage%d' % n,
+            command         = [
+                "ninja", "-l80",
+                ],
+            description     = ["building", "stage%d" % n],
+            descriptionDone = ["built",    "stage%d" % n],
+            warnOnWarnings = warn,
+            timeout=300,
+            workdir=workdir))
+
+    if n != 3:
+        factory.addStep(LitTestCommand(
+                name            = 'test_stage%d' % n,
+                command         = [
+                    "ninja", "check-all",
+                    ],
+                description     = ["testing", "stage%d" % n],
+                descriptionDone = ["test",    "stage%d" % n],
+                timeout=300,
+                warnOnFailure=True,
+                workdir=workdir,
+                ))
+
+    factory.addStep(Compile(
+            name            = 'install',
+            command         = [
+                "ninja", "install",
+                ],
+            description     = ["installing", "stage%d" % n],
+            descriptionDone = ["installed",  "stage%d" % n],
             timeout=3600,
             workdir=workdir))
 
@@ -1320,9 +1424,90 @@ def get_builders():
         env=common_env,
         factory=factory)
 
+    # clang-lld-modules(i686)
+    factory = BuildFactory()
+    AddGitSled4(factory)
 
+    BlobPre(factory)
 
+    PatchLLVMClang(factory, "llvmclang.diff")
 
+    AddCMakeCentOS6Ninja(
+        factory,
+        cmake="cmake-3.9",
+        prefix="builds/install/stage1",
+        CMAKE_C_COMPILER="/home/bb/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        LLVM_TARGETS_TO_BUILD="X86",
+        CMAKE_EXE_LINKER_FLAGS   = '-fuse-ld=gold',
+        CMAKE_MODULE_LINKER_FLAGS= '-fuse-ld=gold',
+        CMAKE_SHARED_LINKER_FLAGS= '-fuse-ld=gold',
+        CLANG_DEFAULT_LINKER="lld",
+        LLVM_BUILD_EXAMPLES="ON",
+        LLVM_BUILD_TESTS="ON",
+        CLANG_BUILD_EXAMPLES="ON",
+        LLVM_LIT_ARGS="-v",
+        buildClang=False,
+        LLVM_ENABLE_PROJECTS="clang;lld")
+
+    # For ccache
+    factory.addStep(Compile(
+            name            = 'recheck_cmake',
+            command         = ["ninja", "build.ninja"],
+            ))
+    factory.addStep(Compile(
+            name            = 'Tweak build.ninja',
+            command         = [
+                "sed", "-i", "-r",
+                r's=(-I|_COMPILER\S* )/home/bb/\w[^/]*/llvm-project=\1../llvm-project=g',
+                "build.ninja",
+                ],
+            ))
+
+    # Stage1
+    factory.addStep(Compile(
+            name            = 'build_stage1',
+            command         = ["ninja", "all"],
+            locks           = [sled4_build_lock.access('exclusive')],
+            description     = ["building", "stage1"],
+            descriptionDone = ["built",    "stage1"]))
+    factory.addStep(LitTestCommand(
+            name            = 'test_stage1',
+            command         = ["ninja", "check-all"],
+            description     = ["testing", "stage1"],
+            descriptionDone = ["test",    "stage1"],
+            timeout=300,
+            ))
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+                                    flunkOnFailure=False))
+    factory.addStep(Compile(
+            name            = 'install_stage1',
+            command         = ["ninja", "install"],
+            description     = ["installing", "stage1"],
+            descriptionDone = ["installed",  "stage1"]))
+
+    factory.addStep(ShellCommand(
+            name="arbitrary_libcxx",
+            command=["cp", "-v", "libc++.a", "builds/install/stage1/lib"],
+            workdir="."))
+
+    BuildStageNlibcxx(factory, 2)
+    BuildStageNlibcxx(factory, 3, False)
+
+    BlobPost(factory)
+
+    Compare23(
+        factory,
+        warn=False,
+        )
+
+    yield BuilderConfig(
+        name="bootstrap-clang-libcxx-lld-i686-linux",
+        category="Bootstrap",
+        slavenames=["lab-sled4"],
+        mergeRequests=True,
+        env=common_env,
+        factory=factory)
 
     # CentOS5(llvm-x86)
     factory = BuildFactory()
