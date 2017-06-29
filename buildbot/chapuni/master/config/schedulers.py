@@ -409,15 +409,15 @@ def get_schedulers():
             ])
     yield mingw32_linux
 
-    llvmclang_msc19 = AnyBranchScheduler(
-        name="s_ninja-clang-i686-msc19-R",
-        change_filter = change_cmake_llvmclang,
-        treeStableTimer=1 * 60,
-        upstreams=[testllvmmsc32R, testclangmsc32R, testtoolsmsc32R, mingw32_linux],
-        builderNames=[
-            "ninja-clang-i686-msc19-R",
-            ])
-    yield llvmclang_msc19
+    # llvmclang_msc19 = AnyBranchScheduler(
+    #     name="s_ninja-clang-i686-msc19-R",
+    #     change_filter = change_cmake_llvmclang,
+    #     treeStableTimer=1 * 60,
+    #     upstreams=[testllvmmsc32R, testclangmsc32R, testtoolsmsc32R, mingw32_linux],
+    #     builderNames=[
+    #         "ninja-clang-i686-msc19-R",
+    #         ])
+    # yield llvmclang_msc19
 
     # llvmclang_msc18 = AnyBranchScheduler(
     #     name="s_ninja-clang-i686-msc18-R",
@@ -429,25 +429,25 @@ def get_schedulers():
     #         ])
     # yield llvmclang_msc18
 
-    llvmclang_mingw64 = AnyBranchScheduler(
-        name="s_cmake-clang-x64-mingw64",
-        change_filter = change_cmake_llvmclang,
-        treeStableTimer=2 * 60,
-        upstreams=[llvmclang_msc19, mingw32_linux],
-        builderNames=[
-            "ninja-clang-x64-mingw64-RA",
-            ])
-    yield llvmclang_mingw64
+    # llvmclang_mingw64 = AnyBranchScheduler(
+    #     name="s_cmake-clang-x64-mingw64",
+    #     change_filter = change_cmake_llvmclang,
+    #     treeStableTimer=2 * 60,
+    #     upstreams=[llvmclang_msc19, mingw32_linux],
+    #     builderNames=[
+    #         "ninja-clang-x64-mingw64-RA",
+    #         ])
+    # yield llvmclang_mingw64
 
-    llvmclang_msc19_x64 = AnyBranchScheduler(
-        name="s_msbuild-llvmclang-x64-msc19-DA",
-        change_filter = change_cmake_llvmclang,
-        treeStableTimer=30 * 60,
-        upstreams=[llvmclang_msc19,llvmclang_mingw64,testllvmmsc64RA,testclangmsc64RA,testtoolsmsc64RA],
-        builderNames=[
-            "msbuild-llvmclang-x64-msc19-DA",
-            ])
-    yield llvmclang_msc19_x64
+    # llvmclang_msc19_x64 = AnyBranchScheduler(
+    #     name="s_msbuild-llvmclang-x64-msc19-DA",
+    #     change_filter = change_cmake_llvmclang,
+    #     treeStableTimer=30 * 60,
+    #     upstreams=[llvmclang_msc19,llvmclang_mingw64,testllvmmsc64RA,testclangmsc64RA,testtoolsmsc64RA],
+    #     builderNames=[
+    #         "msbuild-llvmclang-x64-msc19-DA",
+    #         ])
+    # yield llvmclang_msc19_x64
 
     clang_3stage_linux = AnyBranchScheduler(
         name="s_clang-3stage-x86_64-linux",
@@ -462,9 +462,9 @@ def get_schedulers():
     yield ForceScheduler(
         name="force",
         builderNames=[
-            "ninja-clang-x64-mingw64-RA",
-            "ninja-clang-i686-msc19-R",
-            "msbuild-llvmclang-x64-msc19-DA",
+#            "ninja-clang-x64-mingw64-RA",
+#            "ninja-clang-i686-msc19-R",
+#            "msbuild-llvmclang-x64-msc19-DA",
             "clang-3stage-x86_64-linux",
             "i686-mingw32-RA-on-linux",
 

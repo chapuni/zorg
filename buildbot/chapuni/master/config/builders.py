@@ -2717,19 +2717,19 @@ def get_builders():
             ))
 
     # BlobPost(factory)
-    yield BuilderConfig(
-        name="ninja-clang-x64-mingw64-RA",
-        category="Windows",
-        locks=[sled3_glock.access('counting')],
-        mergeRequests=True,
-        slavenames=["lab-sled3"],
-        env={
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            'PATH': r'C:\mingw-w64\x86_64-4.8.5-posix-seh-rt_v4-rev0\mingw64\bin;${PATH};C:\Program Files\CMake-3.9\bin',
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="ninja-clang-x64-mingw64-RA",
+    #     category="Windows",
+    #     locks=[sled3_glock.access('counting')],
+    #     mergeRequests=True,
+    #     slavenames=["lab-sled3"],
+    #     env={
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'PATH': r'C:\mingw-w64\x86_64-4.8.5-posix-seh-rt_v4-rev0\mingw64\bin;${PATH};C:\Program Files\CMake-3.9\bin',
+    #         },
+    #     factory=factory)
 
     # ninja-msc17
     ninja = "C:/bb-win7/ninja.exe"
@@ -3071,21 +3071,21 @@ def get_builders():
             ))
 
     #BlobPost(factory)
-    yield BuilderConfig(
-        name="ninja-clang-i686-msc19-R",
-        category="Windows",
-        locks=[sled3_glock.access('counting')],
-        mergeRequests=True,
-        slavenames=["lab-sled3"],
-        env={
-            'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\10\include\10.0.10240.0\ucrt;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\\shared;C:\Program Files (x86)\Windows Kits\8.1\include\\um;C:\Program Files (x86)\Windows Kits\8.1\include\\winrt',
-            'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\10\lib\10.0.10240.0\ucrt\x86;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\lib\um\x86;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
-            'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\14.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools;C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\;${PATH};C:\Program Files\CMake-3.9\bin',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="ninja-clang-i686-msc19-R",
+    #     category="Windows",
+    #     locks=[sled3_glock.access('counting')],
+    #     mergeRequests=True,
+    #     slavenames=["lab-sled3"],
+    #     env={
+    #         'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\10\include\10.0.10240.0\ucrt;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\\shared;C:\Program Files (x86)\Windows Kits\8.1\include\\um;C:\Program Files (x86)\Windows Kits\8.1\include\\winrt',
+    #         'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\10\lib\10.0.10240.0\ucrt\x86;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\lib\um\x86;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
+    #         'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\14.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools;C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\;${PATH};C:\Program Files\CMake-3.9\bin',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # msc19 x64
     msbuild = "C:/Program Files (x86)/MSBuild/14.0/bin/amd64/msbuild.exe" 
@@ -3411,20 +3411,20 @@ def get_builders():
                 "INSTALL.vcxproj"]))
 
     #BlobPost(factory)
-    yield BuilderConfig(
-        name="msbuild-llvmclang-x64-msc19-DA",
-        category="Windows",
-        mergeRequests=True,
-        slavenames=["lab-sled3"],
-        env={
-            'INCLUDE': r'INCLUDE=C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\10\include\10.0.10240.0\ucrt;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\\shared;C:\Program Files (x86)\Windows Kits\8.1\include\\um;C:\Program Files (x86)\Windows Kits\8.1\include\\winrt',
-            'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB\amd64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB\amd64;C:\Program Files (x86)\Windows Kits\10\lib\10.0.10240.0\ucrt\x64;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\lib\um\x64;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x64',
-            'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\14.0\bin\amd64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\BIN\amd64;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\VCPackages;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools\x64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x64;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\x64;${PATH};C:\Program Files\CMake-3.9\bin',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
-            },
-        factory=factory)
+    # yield BuilderConfig(
+    #     name="msbuild-llvmclang-x64-msc19-DA",
+    #     category="Windows",
+    #     mergeRequests=True,
+    #     slavenames=["lab-sled3"],
+    #     env={
+    #         'INCLUDE': r'INCLUDE=C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\10\include\10.0.10240.0\ucrt;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\\shared;C:\Program Files (x86)\Windows Kits\8.1\include\\um;C:\Program Files (x86)\Windows Kits\8.1\include\\winrt',
+    #         'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB\amd64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB\amd64;C:\Program Files (x86)\Windows Kits\10\lib\10.0.10240.0\ucrt\x64;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\lib\um\x64;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x64',
+    #         'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\14.0\bin\amd64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\BIN\amd64;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\VCPackages;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools\x64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x64;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\x64;${PATH};C:\Program Files\CMake-3.9\bin',
+    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         },
+    #     factory=factory)
 
     # msc18 x64
     msbuild = "c:/Windows/Microsoft.NET/Framework/v4.0.30319/MSBuild.exe"
