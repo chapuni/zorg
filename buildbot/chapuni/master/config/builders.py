@@ -3166,8 +3166,10 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
-            warnOnWarnings = True,
+            haltOnFailure = False,
             flunkOnFailure=False,
+            warnOnFailure=True,
+            warnOnWarnings = True,
             command=[
                 msbuild,
                 "-m:8",
@@ -3289,7 +3291,9 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            haltOnFailure = False,
             flunkOnFailure=False,
+            warnOnFailure=True,
             warnOnWarnings = True,
             command=[
                 msbuild,
@@ -3329,7 +3333,9 @@ def get_builders():
                 sled3_lock.access('exclusive'),
                 ],
             workdir=wd,
+            haltOnFailure = False,
             flunkOnFailure=False,
+            warnOnFailure=True,
             warnOnWarnings = True,
             command=[
                 msbuild,
