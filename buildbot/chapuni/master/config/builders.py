@@ -574,7 +574,7 @@ def BuildStageNlibcxx(factory, n,
         cmake="cmake-3.9",
         source="../../llvm-project/llvm",
         buildClang=True,
-        LLVM_ENABLE_PROJECTS="libcxx;libcxxabi;lld",
+        LLVM_ENABLE_PROJECTS="clang;libcxx;libcxxabi;lld",
         CMAKE_BUILD_TYPE="Release",
         LLVM_ENABLE_MODULES="ON",
         LLVM_ENABLE_ASSERTIONS="OFF",
@@ -952,6 +952,7 @@ def BuildNinja(
     doClean=False,
     i686=False,
     asserts=True,
+    shared=False,
     target=None):
 
     AddGitSled4(factory)
@@ -981,6 +982,9 @@ def BuildNinja(
         cmake_args["LLVM_ENABLE_ASSERTIONS"]="ON"
     else:
         cmake_args["LLVM_ENABLE_ASSERTIONS"]="OFF"
+
+    if shared:
+        cmake_args["BUILD_SHARED_LIBS"]="ON"
 
     if buildLLVM or testLLVM:
         cmake_args['LLVM_BUILD_EXAMPLES']="ON"
@@ -1024,6 +1028,8 @@ def BuildNinja(
         cmake="cmake-3.9",
         CMAKE_C_COMPILER="/home/bb/bin/gcc",
         CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_POSITION_INDEPENDENT_CODE='ON',
+        LLVM_APPEND_VC_REV='OFF',
         doStepIf=Makefile_not_ready,
         **cmake_args)
 
@@ -1068,13 +1074,22 @@ def BuildNinja(
                 ))
 
     if testLLVM:
-        factory.addStep(LitTestCommand(
-                name            = 'test_llvm',
-                command         = ["ninja", "check-llvm"],
-                description     = ["testing", "llvm"],
-                descriptionDone = ["test",    "llvm"],
-                timeout=300,
-                ))
+        if not testClang and not testExtra and not testLLD:
+            factory.addStep(LitTestCommand(
+                    name            = 'test_llvm',
+                    command         = ["ninja", "check-all"],
+                    description     = ["testing", "llvm"],
+                    descriptionDone = ["test",    "llvm"],
+                    timeout=300,
+                    ))
+        else:
+            factory.addStep(LitTestCommand(
+                    name            = 'test_llvm',
+                    command         = ["ninja", "check-llvm"],
+                    description     = ["testing", "llvm"],
+                    descriptionDone = ["test",    "llvm"],
+                    timeout=300,
+                    ))
 
     if testClang:
         factory.addStep(LitTestCommand(
@@ -1119,6 +1134,7 @@ def get_builders():
         factory,
         buildLLVM=True,
         asserts=True,
+        shared=True,
         i686=True)
     yield BuilderConfig(
         name="llvm-i686-linux-RA",
@@ -1133,6 +1149,7 @@ def get_builders():
         factory,
         buildClang=True,
         asserts=True,
+        shared=True,
         i686=True)
     yield BuilderConfig(
         name="clang-i686-linux-RA",
@@ -1147,6 +1164,7 @@ def get_builders():
         factory,
         buildExtra=True,
         asserts=True,
+        shared=True,
         i686=True)
     yield BuilderConfig(
         name="clang-tools-i686-linux-RA",
@@ -1161,6 +1179,7 @@ def get_builders():
         factory,
         buildLLD=True,
         asserts=True,
+        shared=True,
         i686=True)
     yield BuilderConfig(
         name="lld-i686-linux-RA",
@@ -1281,6 +1300,7 @@ def get_builders():
     BuildNinja(
         factory,
         buildLLVM=True,
+        shared=True,
         asserts=False)
     yield BuilderConfig(
         name="llvm-x86_64-linux-R",
@@ -1294,6 +1314,7 @@ def get_builders():
     BuildNinja(
         factory,
         buildClang=True,
+        shared=True,
         asserts=False)
     yield BuilderConfig(
         name="clang-x86_64-linux-R",
@@ -1307,6 +1328,7 @@ def get_builders():
     BuildNinja(
         factory,
         buildExtra=True,
+        shared=True,
         asserts=False)
     yield BuilderConfig(
         name="clang-tools-x86_64-linux-R",
@@ -1320,6 +1342,7 @@ def get_builders():
     BuildNinja(
         factory,
         buildLLD=True,
+        shared=True,
         asserts=False)
     yield BuilderConfig(
         name="lld-x86_64-linux-R",
@@ -1447,7 +1470,7 @@ def get_builders():
         LLVM_BUILD_TESTS="ON",
         CLANG_BUILD_EXAMPLES="ON",
         LLVM_LIT_ARGS="-v",
-        buildClang=False,
+        buildClang=True,
         LLVM_ENABLE_PROJECTS="clang;lld")
 
     # For ccache
@@ -2031,6 +2054,7 @@ def get_builders():
         source="../../llvm-project/llvm",
         prefix="builds/install",
         cmake="cmake-3.9",
+        LLVM_APPEND_VC_REV='OFF',
         LLVM_ENABLE_ASSERTIONS="ON",
         BUILD_SHARED_LIBS="ON",
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",

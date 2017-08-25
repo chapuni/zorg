@@ -162,11 +162,11 @@ change_dragonegg_master = ChangeFilter(filter_fn = filter_cmake_dragonegg,
                                    #branch=['master'],
                                    )
 
-def filter_llvmclanglldcxxabi(change):
+def filter_llvmclangtoolslldcxxabi(change):
     l = Fhtml(getattr(change, "files"))
-    return len(Tclang(l) + Tllvm(l) + Tlld(l) + Tlibcxx(l) + Tlibcxxabi(l)) > 0
+    return len(Tclang(l) + Tclang_extra(l) + Tllvm(l) + Tlld(l) + Tlibcxx(l) + Tlibcxxabi(l)) > 0
 
-change_llvmclanglldcxxabi = ChangeFilter(filter_fn = filter_llvmclanglldcxxabi)
+change_llvmclangtoolslldcxxabi = ChangeFilter(filter_fn = filter_llvmclangtoolslldcxxabi)
 
 # Configure the Schedulers, which decide how to react to incoming changes.  In this
 # case, just kick off a 'runtests' build
@@ -459,7 +459,7 @@ def get_schedulers():
 
     bootstrap_i686_linux = AnyBranchScheduler(
         name="s_bootstrap-clang-libcxx-lld-i686-linux",
-        change_filter = change_llvmclanglldcxxabi,
+        change_filter = change_llvmclangtoolslldcxxabi,
         treeStableTimer=15 * 60,
         upstreams=[testllvm64R, testclang64R, testlld64R],
         builderNames=[
