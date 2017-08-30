@@ -1,7 +1,8 @@
 import buildbot
 from buildbot import util, interfaces
 from zope.interface import implements
-from buildbot.status import builder, mail
+from buildbot.reporters import mail
+from buildbot.status import builder
 
 if buildbot.version[:5] >= '0.8.7':
     def get_change_string(build):
@@ -34,12 +35,12 @@ class InformativeMailNotifier(mail.MailNotifier):
     build failure inside the email."""
 
     implements(interfaces.IEmailSender)
-    compare_attrs = (mail.MailNotifier.compare_attrs +
+    compare_attrs = (list(mail.MailNotifier.compare_attrs) +
                      ["num_lines", "only_failure_logs"])
 
     # Remove messageFormatter from the compare_attrs, that would lead to
     # recursion, and is checked by the class test.
-    compare_attrs.remove("messageFormatter")
+    #compare_attrs.remove("messageFormatter")
 
     def __init__(self, 
                  num_lines = 10, only_failure_logs = True,

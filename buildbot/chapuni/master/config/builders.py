@@ -4,14 +4,15 @@
 
 from buildbot.process.factory import BuildFactory
 from buildbot.steps.master import SetProperty
-from buildbot.steps.source import Git
+from buildbot.steps.source.git import Git
 from buildbot.steps.shell import WithProperties
 from buildbot.steps.shell import ShellCommand
 from buildbot.steps.shell import SetPropertyFromCommand
 from buildbot.steps.shell import Compile
 from buildbot.steps.shell import Test
 from buildbot.steps.slave import RemoveDirectory, MakeDirectory
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED
+#from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED
+from buildbot.process.results import SUCCESS, WARNINGS, FAILURE, SKIPPED
 
 from buildbot.config import BuilderConfig
 
@@ -40,19 +41,19 @@ def not_triggered(step):
                 or step.build.getProperty("scheduler") == 'sa-clang-x86_64-linux')
 
 from buildbot import locks
-centos5_lock = locks.SlaveLock("centos5_lock")
-centos6_lock = locks.SlaveLock("centos6_lock")
-sled4_git_lock = locks.SlaveLock("sled4_git_lock")
-sled4_build_lock = locks.SlaveLock("sled4_build_lock")
-sled3_git_lock = locks.SlaveLock("sled3_git_lock")
-win7_git_lock = locks.SlaveLock("win7_git_lock")
+centos5_lock = locks.WorkerLock("centos5_lock")
+centos6_lock = locks.WorkerLock("centos6_lock")
+sled4_git_lock = locks.WorkerLock("sled4_git_lock")
+sled4_build_lock = locks.WorkerLock("sled4_build_lock")
+sled3_git_lock = locks.WorkerLock("sled3_git_lock")
+win7_git_lock = locks.WorkerLock("win7_git_lock")
 win7_cyg_lock = locks.MasterLock("win7_cyg_lock")
 win7_cyg_glock = locks.MasterLock(
     "win7_cyg_lock",
     maxCount=4,
     )
-sled3_lock = locks.SlaveLock("sled3_lock")
-sled3_glock = locks.SlaveLock(
+sled3_lock = locks.WorkerLock("sled3_lock")
+sled3_glock = locks.WorkerLock(
     "sled3_glock",
     maxCount=4,
     )
@@ -103,7 +104,7 @@ def AddGitLLVMTree(factory, repo, ref):
                 "rev-list",
                 "--no-walk",
                 "--abbrev-commit",
-                WithProperties("refs/tags/t/%(revision)s"),
+                WithProperties("refs/tags/%(revision)s"),
                 ],
             property="revision_hash",
             doStepIf=Revision_unknown,
@@ -141,40 +142,40 @@ def AddGitLLVMTree(factory, repo, ref):
 
 def AddGitFetch(factory, ref, locks=[]):
     factory.addStep(SetPropertyFromCommand(
-            name="git-hash-0",
-            command=[
-                "git",
-                "--git-dir", ref,
-                "rev-list",
-                "--no-walk",
-                "--abbrev-commit",
-                WithProperties("refs/tags/t/%(revision)s"),
-                ],
-            property="revision_hash",
-            hideStepIf=lambda results, s: results==FAILURE,
-            flunkOnFailure=False))
+        name="git-hash-0",
+        command=[
+            "git",
+            "--git-dir", ref,
+            "rev-list",
+            "--no-walk",
+            "--abbrev-commit",
+            WithProperties("refs/tags/%(revision)s"),
+        ],
+        property="revision_hash",
+        hideStepIf=lambda results, s: results==FAILURE,
+        flunkOnFailure=False))
     factory.addStep(ShellCommand(
-            name="git-fetch",
-            command=[
-                "git",
-                "--git-dir", ref,
-                "fetch",
-                "--prune"],
-            locks=locks,
-            doStepIf=Revision_unknown,
-            hideStepIf=lambda results, s: results==SKIPPED,
-            flunkOnFailure=False));
+        name="git-fetch",
+        command=[
+            "git",
+            "--git-dir", ref,
+            "fetch",
+            "--prune"],
+        locks=locks,
+        doStepIf=Revision_unknown,
+        hideStepIf=lambda results, s: results==SKIPPED,
+        flunkOnFailure=False));
 
 def AddGitSled4(factory):
     AddGitFetch(
         factory,
-        '/home/bb/llvm-project.git',
+        '/home/bb9/llvm-project.git',
         [sled4_git_lock.access('counting')])
     AddGitLLVMTree(
         factory,
         'ssh://bb@t.pgr.jp:19922/var/cache/llvm-project-tree.git',
         #'/home/tnakamura/llvm/llvm-project/',
-        '/home/bb/llvm-project.git')
+        '/home/bb9/llvm-project.git')
 
 def AddGitSled3(factory):
     AddGitFetch(
@@ -208,9 +209,9 @@ def AddCMake(factory, G,
 
     cmd = []
     if shlib is not None:
-        cmd += ["env", WithProperties("LD_RUN_PATH=%%(workdir)s/%s" % shlib)]
+        cmd += ["env", WithProperties("LD_RUN_PATH=%%(builddir)s/%s" % shlib)]
     cmd += [cmake, "-G"+G]
-    cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(workdir)s/"+prefix))
+    cmd.append(WithProperties("-DCMAKE_INSTALL_PREFIX=%(builddir)s/"+prefix))
     cmd.append("-DLLVM_BUILD_TESTS=ON")
     if buildClang:
         cmd.append("-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%s/../clang" % source)
@@ -244,8 +245,8 @@ def AddCMakeCentOS5(factory,
 def AddCMakeCentOS6(factory,
                     LLVM_TARGETS_TO_BUILD="all",
                     LLVM_LIT_ARGS="-v",
-                    CMAKE_C_COMPILER="/home/bb/bin/gcc47",
-                    CMAKE_CXX_COMPILER="/home/bb/bin/g++47",
+                    CMAKE_C_COMPILER="/home/bb9/bin/gcc47",
+                    CMAKE_CXX_COMPILER="/home/bb9/bin/g++47",
                     **kwargs):
     AddCMake(
         factory, "Unix Makefiles",
@@ -263,8 +264,8 @@ def AddCMakeCentOS6(factory,
 def AddCMakeCentOS6Ninja(factory,
                          LLVM_TARGETS_TO_BUILD="all",
                          LLVM_LIT_ARGS="-v",
-                         CMAKE_C_COMPILER="/home/bb/bin/gcc47",
-                         CMAKE_CXX_COMPILER="/home/bb/bin/g++47",
+                         CMAKE_C_COMPILER="/home/bb9/bin/gcc47",
+                         CMAKE_CXX_COMPILER="/home/bb9/bin/g++47",
                          **kwargs):
     AddCMake(
         factory, "Ninja",
@@ -345,7 +346,7 @@ def AddLitSled3(factory, name, dir,
 
 def AddCleanBin(factory):
     factory.addStep(MakeDirectory(
-            dir=WithProperties("%(workdir)s/build/bin"),
+            dir=WithProperties("%(builddir)s/build/bin"),
             flunkOnFailure=False))
     factory.addStep(ShellCommand(
             name            = 'rmbin',
@@ -367,11 +368,11 @@ def BuildStageN(factory, n,
     tmpinst="%s/stagen" % instroot
     factory.addStep(ShellCommand(
             command=[
-                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
-                WithProperties("CC=%%(workdir)s/%s/clang -std=gnu89" % tools),
-                WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
-                WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
-                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                WithProperties("%(builddir)s/llvm-project/llvm/configure"),
+                WithProperties("CC=%%(builddir)s/%s/clang -std=gnu89" % tools),
+                WithProperties("CXX=%%(builddir)s/%s/clang++" % tools),
+                WithProperties("--prefix=%%(builddir)s/%s" % tmpinst),
+                WithProperties("--with-clang-srcdir=%(builddir)s/llvm-project/clang"),
                 "--disable-timestamps",
                 "--disable-assertions",
                 "--enable-optimized"],
@@ -419,11 +420,11 @@ def BuildStageN8(factory, n,
     tmpinst="%s/stagen" % instroot
     factory.addStep(ShellCommand(
             command=[
-                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
-                WithProperties("CC=%%(workdir)s/%s/clang" % tools),
-                WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
-                WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
-                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                WithProperties("%(builddir)s/llvm-project/llvm/configure"),
+                WithProperties("CC=%%(builddir)s/%s/clang" % tools),
+                WithProperties("CXX=%%(builddir)s/%s/clang++" % tools),
+                WithProperties("--prefix=%%(builddir)s/%s" % tmpinst),
+                WithProperties("--with-clang-srcdir=%(builddir)s/llvm-project/clang"),
                 "--with-python=/usr/bin/python3",
                 "--disable-timestamps",
                 "--disable-assertions",
@@ -493,11 +494,11 @@ def BuildStageNCMake(factory, n,
         LLVM_ENABLE_ASSERTIONS="OFF",
         LLVM_BUILD_EXAMPLES="ON",
         CLANG_BUILD_EXAMPLES="ON",
-        __CMAKE_C_COMPILER=WithProperties("-DCMAKE_C_COMPILER=%%(workdir)s/%s/clang" % tools),
-        __CMAKE_CXX_COMPILER=WithProperties("-DCMAKE_CXX_COMPILER=%%(workdir)s/%s/clang++" % tools),
-        __CMAKE_AR=WithProperties("-DCMAKE_AR=%%(workdir)s/%s/llvm-ar" % tools),
-        __CMAKE_RANLIB=WithProperties("-DCMAKE_RANLIB=%%(workdir)s/%s/llvm-ranlib" % tools),
-        #__CMAKE_CXX_CREATE_STATIC_LIBRARY=WithProperties("CMAKE_CXX_CREATE_STATIC_LIBRARY='<CMAKE_COMMAND> -E remove <TARGET>;%%(workdir)s/%s/llvm-ar rcs <TARGET> <OBJECTS>'" % tools),
+        __CMAKE_C_COMPILER=WithProperties("-DCMAKE_C_COMPILER=%%(builddir)s/%s/clang" % tools),
+        __CMAKE_CXX_COMPILER=WithProperties("-DCMAKE_CXX_COMPILER=%%(builddir)s/%s/clang++" % tools),
+        __CMAKE_AR=WithProperties("-DCMAKE_AR=%%(builddir)s/%s/llvm-ar" % tools),
+        __CMAKE_RANLIB=WithProperties("-DCMAKE_RANLIB=%%(builddir)s/%s/llvm-ranlib" % tools),
+        #__CMAKE_CXX_CREATE_STATIC_LIBRARY=WithProperties("CMAKE_CXX_CREATE_STATIC_LIBRARY='<CMAKE_COMMAND> -E remove <TARGET>;%%(builddir)s/%s/llvm-ar rcs <TARGET> <OBJECTS>'" % tools),
         CMAKE_C_FLAGS  ="-flto -fuse-ld=gold -Wdocumentation -Wno-unused-command-line-argument",
         CMAKE_CXX_FLAGS="-flto -fuse-ld=gold -Wdocumentation -Wno-unused-command-line-argument",
         CMAKE_EXE_LINKER_FLAGS   ="-flto -fuse-ld=gold -Wunused-command-line-argument",
@@ -584,8 +585,8 @@ def BuildStageNlibcxx(factory, n,
         CLANG_DEFAULT_LINKER="lld",
         CLANG_DEFAULT_CXX_STDLIB="libc++",
         CLANG_BUILD_EXAMPLES="ON",
-        __CMAKE_C_COMPILER=WithProperties("-DCMAKE_C_COMPILER=%%(workdir)s/%s/clang" % tools),
-        __CMAKE_CXX_COMPILER=WithProperties("-DCMAKE_CXX_COMPILER=%%(workdir)s/%s/clang++" % tools),
+        __CMAKE_C_COMPILER=WithProperties("-DCMAKE_C_COMPILER=%%(builddir)s/%s/clang" % tools),
+        __CMAKE_CXX_COMPILER=WithProperties("-DCMAKE_CXX_COMPILER=%%(builddir)s/%s/clang++" % tools),
         CMAKE_C_FLAGS  ="",
         LLVM_TARGETS_TO_BUILD="all",
         LLVM_LIT_ARGS="-v",
@@ -593,10 +594,10 @@ def BuildStageNlibcxx(factory, n,
 
         # Tweaks
         LLVM_FORCE_USE_OLD_TOOLCHAIN="ON",
-        __CMAKE_CXX_FLAGS=WithProperties("-Wno-unused-command-line-argument -stdlib=platform -isystem %%(workdir)s/%s/projects/libcxx/include -isystem %%(workdir)s/llvm-project/libcxx/include" % workdir),
-        __CMAKE_EXE_LINKER_FLAGS   =WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib -Wl,-rpath,%%(workdir)s/%s/lib" % (workdir, workdir)),
-        __CMAKE_MODULE_LINKER_FLAGS=WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib" % (workdir)),
-        __CMAKE_SHARED_LINKER_FLAGS=WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib" % (workdir)),
+        __CMAKE_CXX_FLAGS=WithProperties("-Wno-unused-command-line-argument -stdlib=platform -isystem %%(builddir)s/%s/projects/libcxx/include -isystem %%(builddir)s/llvm-project/libcxx/include" % workdir),
+        __CMAKE_EXE_LINKER_FLAGS   =WithProperties("-stdlib=libc++ -L %%(builddir)s/%s/lib -Wl,-rpath,%%(builddir)s/%s/lib" % (workdir, workdir)),
+        __CMAKE_MODULE_LINKER_FLAGS=WithProperties("-stdlib=libc++ -L %%(builddir)s/%s/lib" % (workdir)),
+        __CMAKE_SHARED_LINKER_FLAGS=WithProperties("-stdlib=libc++ -L %%(builddir)s/%s/lib" % (workdir)),
 
         prefix="builds/install/stagen",
         workdir=workdir)
@@ -670,11 +671,11 @@ def BuildStage32N77(factory, n,
     tmpinst="%s/stagen" % instroot
     factory.addStep(ShellCommand(
             command=[
-                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
-                WithProperties("CC=%%(workdir)s/%s/clang" % tools),
-                WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
-                WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
-                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                WithProperties("%(builddir)s/llvm-project/llvm/configure"),
+                WithProperties("CC=%%(builddir)s/%s/clang" % tools),
+                WithProperties("CXX=%%(builddir)s/%s/clang++" % tools),
+                WithProperties("--prefix=%%(builddir)s/%s" % tmpinst),
+                WithProperties("--with-clang-srcdir=%(builddir)s/llvm-project/clang"),
                 "--with-python=/usr/bin/python3",
                 "--disable-timestamps",
                 "--disable-assertions",
@@ -743,11 +744,11 @@ def BuildStageNcyg(
     tmpinst="%s/stagen" % instroot
     factory.addStep(ShellCommand(
             command=[
-                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
-                WithProperties("CC=%%(workdir)s/%s/clang" % tools),
-                WithProperties("CXX=%%(workdir)s/%s/clang++" % tools),
-                WithProperties("--prefix=%%(workdir)s/%s" % tmpinst),
-                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                WithProperties("%(builddir)s/llvm-project/llvm/configure"),
+                WithProperties("CC=%%(builddir)s/%s/clang" % tools),
+                WithProperties("CXX=%%(builddir)s/%s/clang++" % tools),
+                WithProperties("--prefix=%%(builddir)s/%s" % tmpinst),
+                WithProperties("--with-clang-srcdir=%(builddir)s/llvm-project/clang"),
                 "LIBS=-static",
                 "--enable-cxx11",
                 "--disable-timestamps",
@@ -961,7 +962,7 @@ def BuildNinja(
     if doClean:
         AddCleanBin(factory)
 
-    PatchLLVMClang(factory, "llvmclang.diff")
+    #PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     cmake_args={
         'CMAKE_EXE_LINKER_FLAGS'   : '-fuse-ld=gold',
@@ -1026,8 +1027,8 @@ def BuildNinja(
     AddCMakeCentOS6Ninja(
         factory,
         cmake="cmake-3.9",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         CMAKE_POSITION_INDEPENDENT_CODE='ON',
         LLVM_APPEND_VC_REV='OFF',
         doStepIf=Makefile_not_ready,
@@ -1042,7 +1043,7 @@ def BuildNinja(
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER\S* )/home/bb/\w[^/]*/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb9/\w[^/]*/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -1123,9 +1124,9 @@ def BuildNinja(
 def get_builders():
     common_env={
         'LIT_PRESERVES_TMP': '1',
-        'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-        'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-        'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+        'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+        'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+        'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
         }
 
     # i686-RA Builds
@@ -1139,8 +1140,7 @@ def get_builders():
     yield BuilderConfig(
         name="llvm-i686-linux-RA",
         category="Linux fast",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
         factory=factory)
 
@@ -1154,9 +1154,9 @@ def get_builders():
     yield BuilderConfig(
         name="clang-i686-linux-RA",
         category="Linux fast",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["llvm-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1169,9 +1169,9 @@ def get_builders():
     yield BuilderConfig(
         name="clang-tools-i686-linux-RA",
         category="Linux fast",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["clang-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1184,9 +1184,9 @@ def get_builders():
     yield BuilderConfig(
         name="lld-i686-linux-RA",
         category="Linux fast",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["llvm-i686-linux-RA"],
         factory=factory)
 
     # i686-RA tests
@@ -1200,9 +1200,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-llvm-i686-linux-RA",
         category="Tests on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["llvm-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1215,9 +1215,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-clang-i686-linux-RA",
         category="Tests on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["clang-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1230,9 +1230,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-clang-tools-i686-linux-RA",
         category="Tests on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["clang-tools-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1245,9 +1245,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-lld-i686-linux-RA",
         category="Tests on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["lld-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1260,9 +1260,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-llvm-msc-x64-on-i686-linux-RA",
         category="Tests msc on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-llvm-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1275,9 +1275,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-clang-msc-x64-on-i686-linux-RA",
         category="Tests msc on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-clang-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1290,9 +1290,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-clang-tools-msc-x64-on-i686-linux-RA",
         category="Tests msc on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-clang-tools-i686-linux-RA"],
         factory=factory)
 
     # x86_64-R Builds
@@ -1305,9 +1305,9 @@ def get_builders():
     yield BuilderConfig(
         name="llvm-x86_64-linux-R",
         category="Linux fast",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["llvm-i686-linux-RA"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1319,9 +1319,9 @@ def get_builders():
     yield BuilderConfig(
         name="clang-x86_64-linux-R",
         category="Linux fast",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["clang-i686-linux-RA", "llvm-x86_64-linux-R"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1333,9 +1333,9 @@ def get_builders():
     yield BuilderConfig(
         name="clang-tools-x86_64-linux-R",
         category="Linux fast",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["clang-tools-i686-linux-RA", "clang-x86_64-linux-R"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1347,9 +1347,9 @@ def get_builders():
     yield BuilderConfig(
         name="lld-x86_64-linux-R",
         category="Linux fast",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["lld-i686-linux-RA", "llvm-x86_64-linux-R"],
         factory=factory)
 
     # x86_64-R Tests
@@ -1361,9 +1361,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-llvm-x86_64-linux-R",
         category="Tests on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-llvm-i686-linux-RA", "llvm-x86_64-linux-R"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1374,9 +1374,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-clang-x86_64-linux-R",
         category="Tests on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-clang-i686-linux-RA", "clang-x86_64-linux-R"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1387,9 +1387,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-clang-tools-x86_64-linux-R",
         category="Tests on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["clang-tools-i686-linux-RA", "clang-tools-x86_64-linux-R"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1400,9 +1400,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-lld-x86_64-linux-R",
         category="Tests on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-lld-i686-linux-RA", "lld-x86_64-linux-R"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1414,9 +1414,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-llvm-msc-x86-on-x86_64-linux-R",
         category="Tests msc on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-llvm-msc-x64-on-i686-linux-RA", "test-llvm-x86_64-linux-R"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1428,9 +1428,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-clang-msc-x86-on-x86_64-linux-R",
         category="Tests msc on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-clang-msc-x64-on-i686-linux-RA", "test-clang-x86_64-linux-R"],
         factory=factory)
 
     factory = BuildFactory()
@@ -1442,9 +1442,9 @@ def get_builders():
     yield BuilderConfig(
         name="test-clang-tools-msc-x86-on-x86_64-linux-R",
         category="Tests msc on Linux",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=["test-clang-tools-msc-x64-on-i686-linux-RA", "test-clang-tools-x86_64-linux-R"],
         factory=factory)
 
     # clang-lld-modules(i686)
@@ -1453,14 +1453,14 @@ def get_builders():
 
     BlobPre(factory)
 
-    PatchLLVMClang(factory, "llvmclang.diff")
+    #PatchLLVMClang(factory, "llvmclang.diff")
 
     AddCMakeCentOS6Ninja(
         factory,
         cmake="cmake-3.9",
         prefix="builds/install/stage1",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         LLVM_TARGETS_TO_BUILD="X86",
         CMAKE_EXE_LINKER_FLAGS   = '-fuse-ld=gold',
         CMAKE_MODULE_LINKER_FLAGS= '-fuse-ld=gold',
@@ -1482,7 +1482,7 @@ def get_builders():
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER\S* )/home/bb/\w[^/]*/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb9/\w[^/]*/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -1501,7 +1501,7 @@ def get_builders():
             descriptionDone = ["test",    "stage1"],
             timeout=300,
             ))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/builds"),
                                     flunkOnFailure=False))
     factory.addStep(Compile(
             name            = 'install_stage1',
@@ -1527,9 +1527,27 @@ def get_builders():
     yield BuilderConfig(
         name="bootstrap-clang-libcxx-lld-i686-linux",
         category="Bootstrap",
-        slavenames=["lab-sled4"],
-        mergeRequests=True,
+        workernames=["lab-sled4"],
         env=common_env,
+        upstreams=[
+            "llvm-i686-linux-RA",
+            "clang-i686-linux-RA",
+            "clang-tools-i686-linux-RA",
+            "lld-i686-linux-RA",
+            "test-llvm-i686-linux-RA",
+            "test-clang-i686-linux-RA",
+            "test-clang-tools-i686-linux-RA",
+            "test-lld-i686-linux-RA",
+
+            "llvm-x86_64-linux-R",
+            "clang-x86_64-linux-R",
+            "clang-tools-x86_64-linux-R",
+            "lld-x86_64-linux-R",
+            "test-llvm-x86_64-linux-R",
+            "test-clang-x86_64-linux-R",
+            "test-clang-tools-x86_64-linux-R",
+            "test-lld-x86_64-linux-R",
+        ],
         factory=factory)
 
     # CentOS5(llvm-x86)
@@ -1568,8 +1586,8 @@ def get_builders():
         LLVM_BUILD_EXAMPLES="ON",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_BINUTILS_INCDIR="/usr/include",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         doStepIf=Makefile_not_ready)
 
     # For ccache
@@ -1581,7 +1599,7 @@ def get_builders():
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER\S* )/home/bb/cmake-llvm-x86_64-linux/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb9/cmake-llvm-x86_64-linux/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -1622,9 +1640,9 @@ def get_builders():
     #     env={
     #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -1664,8 +1682,8 @@ def get_builders():
         LLVM_BUILD_RUNTIME="OFF",
         LLVM_BUILD_TESTS="OFF",
         LLVM_BUILD_TOOLS="OFF",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         CLANG_BUILD_EXAMPLES="ON",
         doStepIf=Makefile_not_ready)
@@ -1679,7 +1697,7 @@ def get_builders():
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER\S* )/home/bb/cmake-clang-x86_64-linux/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb9/cmake-clang-x86_64-linux/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -1691,7 +1709,7 @@ def get_builders():
             description     = ["building", "clang"],
             descriptionDone = ["built",    "clang"]))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'test_clang',
@@ -1722,9 +1740,9 @@ def get_builders():
     #     env={
     #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -1742,8 +1760,8 @@ def get_builders():
         LLVM_BUILD_RUNTIME="OFF",
         LLVM_BUILD_TESTS="OFF",
         LLVM_BUILD_TOOLS="OFF",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_EXTERNAL_LLD_SOURCE_DIR="../llvm-project/lld",
         doStepIf=Makefile_not_ready)
@@ -1757,7 +1775,7 @@ def get_builders():
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER\S* )/home/bb/[^/]+/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb9/[^/]+/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -1797,9 +1815,9 @@ def get_builders():
     #     env={
     #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -1820,8 +1838,8 @@ def get_builders():
         LLVM_BUILD_TOOLS="OFF",
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         CLANG_BUILD_EXAMPLES="ON",
         doStepIf=Makefile_not_ready)
 
@@ -1834,7 +1852,7 @@ def get_builders():
             name            = 'Tweak build.ninja',
             command         = [
                 "sed", "-i", "-r",
-                r's=(-I|_COMPILER\S* )/home/bb/cmake-clang-tools-x86_64-linux/llvm-project=\1../llvm-project=g',
+                r's=(-I|_COMPILER\S* )/home/bb9/cmake-clang-tools-x86_64-linux/llvm-project=\1../llvm-project=g',
                 "build.ninja",
                 ],
             ))
@@ -1868,9 +1886,9 @@ def get_builders():
     #     env={
     #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -1949,9 +1967,9 @@ def get_builders():
     #     env={
     #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.1/bin:${PATH}',
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -1972,8 +1990,8 @@ def get_builders():
         CLANG_BUILD_EXAMPLES="ON",
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../llvm-project/clang-tools-extra",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         doStepIf=Makefile_not_ready,
         )
     factory.addStep(Compile(
@@ -1983,7 +2001,7 @@ def get_builders():
             description     = ["building", "llvmclang"],
             descriptionDone = ["built",    "llvmclang"]))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'test_all',
@@ -2015,9 +2033,9 @@ def get_builders():
     #     mergeRequests=True,
     #     env={
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -2026,7 +2044,7 @@ def get_builders():
     AddGitSled4(factory)
     BlobPre(factory)
 
-    PatchLLVMClang(factory, "llvmclang.diff")
+    #PatchLLVMClang(factory, "llvmclang.diff")
     wd="builds/tblgen"
     CheckMakefile2(factory, makefile="build.ninja", workdir=wd)
     AddCMakeCentOS6Ninja(
@@ -2034,8 +2052,8 @@ def get_builders():
         source="../../llvm-project/llvm",
         cmake="cmake-3.9",
         LLVM_ENABLE_ASSERTIONS="ON",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         workdir=wd,
         doStepIf=Makefile_not_ready2
         )
@@ -2058,12 +2076,12 @@ def get_builders():
         LLVM_ENABLE_ASSERTIONS="ON",
         BUILD_SHARED_LIBS="ON",
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
-        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/"+tblgen+"/bin/llvm-tblgen"),
-        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/"+tblgen+"/bin/clang-tblgen"),
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(builddir)s/"+tblgen+"/bin/llvm-tblgen"),
+        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(builddir)s/"+tblgen+"/bin/clang-tblgen"),
         CMAKE_TOOLCHAIN_FILE="../../toolchain-mingw32.cmake",
-        CMAKE_C_COMPILER="/home/bb/bin/i686-w64-mingw32-gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/i686-w64-mingw32-g++",
-        __CROSS_TOOLCHAIN_FLAGS_NATIVE=WithProperties("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=-DCMAKE_C_COMPILER=/home/bb/bin/gcc;-DCMAKE_CXX_COMPILER=/home/bb/bin/g++;-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%(workdir)s/llvm-project/clang;-DPYTHON_EXECUTABLE=/usr/bin/python3"),
+        CMAKE_C_COMPILER="/home/bb9/bin/i686-w64-mingw32-gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/i686-w64-mingw32-g++",
+        __CROSS_TOOLCHAIN_FLAGS_NATIVE=WithProperties("-DCROSS_TOOLCHAIN_FLAGS_NATIVE=-DCMAKE_C_COMPILER=/home/bb9/bin/gcc;-DCMAKE_CXX_COMPILER=/home/bb9/bin/g++;-DLLVM_EXTERNAL_CLANG_SOURCE_DIR=%(builddir)s/llvm-project/clang;-DPYTHON_EXECUTABLE=/usr/bin/python3"),
         #CMAKE_EXE_LINKER_FLAGS   ="-Wl,--no-insert-timestamp",
         #CMAKE_MODULE_LINKER_FLAGS="-Wl,--no-insert-timestamp",
         #CMAKE_SHARED_LINKER_FLAGS="-Wl,--no-insert-timestamp",
@@ -2089,13 +2107,17 @@ def get_builders():
         category="Linux cross",
         slavenames=["lab-sled4"],
         #mergeRequests=False,
-        mergeRequests=True,
         env={
             'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
             },
+        upstreams=[
+            "llvm-i686-linux-RA",
+            "clang-i686-linux-RA",
+            "clang-tools-i686-linux-RA",
+        ],
         factory=factory)
 
     # CentOS5(3stage)
@@ -2103,7 +2125,7 @@ def get_builders():
     AddGitLLVMTree(factory,
                    '/var/cache/llvm-project-tree.git',
                    '/var/cache/llvm-project.git')
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/builds"),
                                     flunkOnFailure=False))
     #PatchLLVMClang(factory, "llvmclang.diff")
     AddCMakeCentOS5(factory,
@@ -2116,7 +2138,7 @@ def get_builders():
             command         = ["make", "-j4", "-k", "check"],
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output"),
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules/Output"),
                                     flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
@@ -2133,7 +2155,7 @@ def get_builders():
     BuildStageN(factory, 3)
 
     # Trail
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/last"),
                                     flunkOnFailure=False))
     factory.addStep(ShellCommand(name="save_builds",
                                  command=["mv", "-v",
@@ -2161,7 +2183,7 @@ def get_builders():
     factory = BuildFactory()
     AddGitSled4(factory)
     BlobPre(factory)
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/builds"),
                                     flunkOnFailure=False))
     PatchLLVMClang(factory, "llvmclang.diff")
 
@@ -2172,10 +2194,10 @@ def get_builders():
                     LLVM_BUILD_EXAMPLES="ON",
                     CLANG_BUILD_EXAMPLES="ON",
                     #BUILD_SHARED_LIBS="ON",
-                    __CMAKE_EXE_LINKER_FLAGS=WithProperties("-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,%(workdir)s/build/lib"),
+                    __CMAKE_EXE_LINKER_FLAGS=WithProperties("-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,%(builddir)s/build/lib"),
                     LLVM_BINUTILS_INCDIR="/usr/include",
-                    CMAKE_C_COMPILER="/home/bb/bin/gcc",
-                    CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+                    CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+                    CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
                     prefix="builds/install/stage1")
     factory.addStep(Compile(
             name="stage1_build",
@@ -2191,7 +2213,7 @@ def get_builders():
             timeout=60,
             ))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
@@ -2208,8 +2230,8 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "ln", "-svf",
-                WithProperties("%(workdir)s/builds/install/stage1/bin/llvm-ar"),
-                WithProperties("%(workdir)s/builds/install/stage1/bin/llvm-ranlib"),
+                WithProperties("%(builddir)s/builds/install/stage1/bin/llvm-ar"),
+                WithProperties("%(builddir)s/builds/install/stage1/bin/llvm-ranlib"),
                 ],
             flunkOnFailure=False))
 
@@ -2221,7 +2243,7 @@ def get_builders():
 
     # Trail
     BlobPost(factory)
-    # factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
+    # factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/last"),
     #                                 flunkOnFailure=False))
     # factory.addStep(ShellCommand(name="save_builds",
     #                              command=["mv", "-v",
@@ -2236,13 +2258,12 @@ def get_builders():
         name="clang-3stage-x86_64-linux",
         category="Bootstrap",
         slavenames=["lab-sled4"],
-        mergeRequests=True,
         env={
             'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
             'LIT_PRESERVES_TMP': '1',
-            'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-            'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-            'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+            'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+            'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+            'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
             },
         factory=factory)
 
@@ -2250,7 +2271,7 @@ def get_builders():
     factory = BuildFactory()
     AddGitSled4(factory)
     BlobPre(factory)
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/builds"),
                                     flunkOnFailure=False))
     PatchLLVMClang(factory, "llvmclang.diff")
 
@@ -2258,11 +2279,11 @@ def get_builders():
     wd="builds/stage1-llvm"
     factory.addStep(ShellCommand(
             command=[
-                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                WithProperties("%(builddir)s/llvm-project/llvm/configure"),
                 "-C",
-                "CC=/home/bb/bin/gcc",
-                "CXX=/home/bb/bin/g++",
-                WithProperties("--prefix=%(workdir)s/builds/install/stage1-llvm"),
+                "CC=/home/bb9/bin/gcc",
+                "CXX=/home/bb9/bin/g++",
+                WithProperties("--prefix=%(builddir)s/builds/install/stage1-llvm"),
                 "--with-python=/usr/bin/python3",
                 "--enable-cxx11",
                 "--enable-optimized",
@@ -2311,10 +2332,10 @@ def get_builders():
         factory,
         buildClang=False,
         source="../../llvm-project/clang",
-        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(workdir)s/builds/install/stage1-llvm/bin/llvm-config"),
+        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(builddir)s/builds/install/stage1-llvm/bin/llvm-config"),
         LLVM_INSTALL_TOOLCHAIN_ONLY="ON",
-        CMAKE_C_COMPILER="/home/bb/bin/gcc",
-        CMAKE_CXX_COMPILER="/home/bb/bin/g++",
+        CMAKE_C_COMPILER="/home/bb9/bin/gcc",
+        CMAKE_CXX_COMPILER="/home/bb9/bin/g++",
         prefix="builds/install/stage1",
         workdir=wd,
         )
@@ -2325,7 +2346,7 @@ def get_builders():
             workdir=wd,
             ))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/builds/stage1-clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/builds/stage1-clang/test/Modules"),
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
@@ -2362,9 +2383,9 @@ def get_builders():
     #     env={
     #         'PATH': '/home/chapuni/BUILD/cmake-2.8.12.2/bin:${PATH}',
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -2376,8 +2397,8 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build"),
-                WithProperties("%(workdir)s/install"),
+                WithProperties("%(builddir)s/build"),
+                WithProperties("%(builddir)s/install"),
                 ],
             flunkOnFailure=False))
 
@@ -2385,12 +2406,12 @@ def get_builders():
     #CheckMakefile(factory)
     factory.addStep(ShellCommand(
             command=[
-                WithProperties("%(workdir)s/llvm-project/llvm/configure"),
+                WithProperties("%(builddir)s/llvm-project/llvm/configure"),
                 "-C",
-                "CC=/home/bb/bin/gcc",
-                "CXX=/home/bb/bin/g++",
-                WithProperties("--prefix=%(workdir)s/install"),
-                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                "CC=/home/bb9/bin/gcc",
+                "CXX=/home/bb9/bin/g++",
+                WithProperties("--prefix=%(builddir)s/install"),
+                WithProperties("--with-clang-srcdir=%(builddir)s/llvm-project/clang"),
                 "--with-python=/usr/bin/python3",
                 "--target=i686-pc-cygwin",
                 "--enable-cxx11",
@@ -2424,7 +2445,7 @@ def get_builders():
                 ],
             ))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_llvmclang",
@@ -2451,9 +2472,9 @@ def get_builders():
     #     mergeRequests=True,
     #     env={
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -2464,9 +2485,9 @@ def get_builders():
                     '/cygdrive/d/llvm-project.git')
     BlobPre(factory)
     PatchLLVMClang(factory, "llvmclang.diff")
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/builds"),
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/builds"),
                                     flunkOnFailure=False))
-    factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/llvm-project/clang/test/Index"),
+    factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/llvm-project/clang/test/Index"),
                                     flunkOnFailure=False))
 #     AddCMake(factory, "Unix Makefiles",
 #              LLVM_TARGETS_TO_BUILD="X86",
@@ -2481,8 +2502,8 @@ def get_builders():
             command=[
                 "../llvm-project/llvm/configure",
                 "-C",
-                WithProperties("--prefix=%(workdir)s/builds/install/stage1"),
-                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                WithProperties("--prefix=%(builddir)s/builds/install/stage1"),
+                WithProperties("--with-clang-srcdir=%(builddir)s/llvm-project/clang"),
                 "LIBS=-static",
                 "--enable-cxx11",
                 "--disable-timestamps",
@@ -2536,7 +2557,7 @@ def get_builders():
             description     = ["testing", "llvm"],
             descriptionDone = ["test",    "llvm"]))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name            = 'stage1_test_clang',
@@ -2567,7 +2588,7 @@ def get_builders():
 
     # Trail
     BlobPost(factory)
-    # factory.addStep(RemoveDirectory(dir=WithProperties("%(workdir)s/last"),
+    # factory.addStep(RemoveDirectory(dir=WithProperties("%(builddir)s/last"),
     #                                 flunkOnFailure=False))
     # factory.addStep(ShellCommand(name="save_builds",
     #                              command=["mv", "-v",
@@ -2585,9 +2606,9 @@ def get_builders():
     #     mergeRequests=True,
     #     env={
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -2611,7 +2632,7 @@ def get_builders():
                 #"-C",
                 "CC=ccache gcc",
                 "CXX=ccache g++",
-                WithProperties("--with-clang-srcdir=%(workdir)s/llvm-project/clang"),
+                WithProperties("--with-clang-srcdir=%(builddir)s/llvm-project/clang"),
                 "--enable-optimized",
                 "--with-optimize-option=-O1 -UPPC",
                 "--build=ppc-redhat-linux"],
@@ -2631,10 +2652,10 @@ def get_builders():
             timeout=2 * 60 * 60,
             ))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Analysist"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Analysist"),
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
@@ -2688,7 +2709,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
@@ -2706,9 +2727,9 @@ def get_builders():
     #     slavenames=["win7"],
     #     env={
     #         'LIT_USE_INTERNAL_SHELL': '0',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -2728,7 +2749,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
@@ -2771,7 +2792,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
     AddLitDOS(factory, "clang", "tools/clang/test")
 
@@ -2791,9 +2812,9 @@ def get_builders():
     #     mergeRequests=True,
     #     slavenames=["win7"],
     #     env={
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -2836,7 +2857,7 @@ def get_builders():
             ])
 
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     AddLitDOS(factory, "clang", "tools/clang/test")
     BlobAdd(factory, ["build/tools/clang/test"])
@@ -2860,9 +2881,9 @@ def get_builders():
     #     mergeRequests=True,
     #     slavenames=["win7"],
     #     env={
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         'PATH':   dospaths([gccpath, "${PATH}", "C:/bb-win7"]),
     #         },
     #     factory=factory)
@@ -2908,7 +2929,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
                 ],
             flunkOnFailure=False))
     AddLitSled3(factory, "clang", "tools/clang/test")
@@ -2933,9 +2954,9 @@ def get_builders():
     #     mergeRequests=True,
     #     slavenames=["lab-sled3"],
     #     env={
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         'PATH': r'C:\mingw-w64\x86_64-4.8.5-posix-seh-rt_v4-rev0\mingw64\bin;${PATH};C:\Program Files\CMake-3.9\bin',
     #         },
     #     factory=factory)
@@ -3048,9 +3069,9 @@ def get_builders():
     #         'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include;C:\Program Files (x86)\Windows Kits\8.0\Include\shared;C:\Program Files (x86)\Windows Kits\8.0\Include\um;C:\Program Files (x86)\Windows Kits\8.0\Include\winrt',
     #         'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
     #         'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};C:\bb-win7',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -3138,7 +3159,7 @@ def get_builders():
             "build/tools/clang/unittests",
             ])
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
             flunkOnFailure=False))
     AddLitDOS(factory, "clang", "tools/clang/test")
     BlobAdd(factory, ["build/tools/clang"])
@@ -3164,9 +3185,9 @@ def get_builders():
     #         'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
     #         'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\Microsoft SDKs\F#\3.1\Framework\v4.0\;C:\Program Files (x86)\MSBuild\12.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Windows\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools;C:\Program Files (x86)\CMake-3.4\bin;${PATH};C:\bb-win7',
     #         'LIT_PRESERVES_TMP': '1',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -3263,7 +3284,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
                 ],
             flunkOnFailure=False))
     AddLitSled3(factory, "clang", "tools/clang/test")
@@ -3290,9 +3311,9 @@ def get_builders():
     #         'INCLUDE': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\10\include\10.0.10240.0\ucrt;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\\shared;C:\Program Files (x86)\Windows Kits\8.1\include\\um;C:\Program Files (x86)\Windows Kits\8.1\include\\winrt',
     #         'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB;C:\Program Files (x86)\Windows Kits\10\lib\10.0.10240.0\ucrt\x86;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\lib\um\x86;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x86',
     #         'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\14.0\bin;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\BIN;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools;C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\VCPackages;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\;${PATH};C:\Program Files\CMake-3.9\bin',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -3350,7 +3371,7 @@ def get_builders():
         source="../../llvm-project/llvm",
         prefix="install/llvm",
         buildClang=False,
-        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(builddir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_BUILD_EXAMPLES="ON",
         workdir=wd,
@@ -3472,8 +3493,8 @@ def get_builders():
         factory, "Visual Studio 14 Win64",
         source="../../llvm-project/clang",
         prefix="install/clang",
-        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(workdir)s/install/llvm/bin/llvm-config.exe"),
-        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
+        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(builddir)s/install/llvm/bin/llvm-config.exe"),
+        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(builddir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
         CMAKE_CXX_FLAGS="/DWIN32 /D_WINDOWS /W3 /Zm1000 /bigobj /GR /EHsc",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
@@ -3578,7 +3599,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules"),
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules"),
                 ],
             flunkOnFailure=False))
     AddLitSled3(factory, "clang", "test",
@@ -3629,9 +3650,9 @@ def get_builders():
     #         'INCLUDE': r'INCLUDE=C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Windows Kits\10\include\10.0.10240.0\ucrt;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um;C:\Program Files (x86)\Windows Kits\8.1\include\\shared;C:\Program Files (x86)\Windows Kits\8.1\include\\um;C:\Program Files (x86)\Windows Kits\8.1\include\\winrt',
     #         'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB\amd64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB\amd64;C:\Program Files (x86)\Windows Kits\10\lib\10.0.10240.0\ucrt\x64;C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\lib\um\x64;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x64',
     #         'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\14.0\bin\amd64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\BIN\amd64;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\VCPackages;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools\x64;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x64;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\x64;${PATH};C:\Program Files\CMake-3.9\bin',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -3690,7 +3711,7 @@ def get_builders():
         source="../../llvm-project/llvm",
         prefix="install/llvm",
         buildClang=False,
-        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(builddir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         LLVM_BUILD_EXAMPLES="ON",
         workdir=wd,
@@ -3794,8 +3815,8 @@ def get_builders():
         factory, "Visual Studio 12 Win64",
         source="../../llvm-project/clang",
         prefix="install/clang",
-        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(workdir)s/install/llvm/bin/llvm-config.exe"),
-        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
+        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(builddir)s/install/llvm/bin/llvm-config.exe"),
+        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(builddir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
         CMAKE_CXX_FLAGS="/DWIN32 /D_WINDOWS /W3 /Zm1000 /bigobj /GR /EHsc",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
@@ -3861,7 +3882,7 @@ def get_builders():
             wd+"/unittests",
             ])
     factory.addStep(RemoveDirectory(
-            dir=WithProperties("%(workdir)s/builds/clang/test/Modules"),
+            dir=WithProperties("%(builddir)s/builds/clang/test/Modules"),
             flunkOnFailure=False))
     AddLitDOS(factory, "clang", "test",
               lit="../../llvm-project/llvm/utils/lit/lit.py",
@@ -3912,9 +3933,9 @@ def get_builders():
     #         'LIB': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\LIB\amd64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\ATLMFC\LIB\amd64;C:\Program Files (x86)\Windows Kits\8.1\lib\winv6.3\um\x64',
     #         'PATH': r'C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow;C:\Program Files (x86)\MSBuild\12.0\bin\amd64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\BIN\amd64;C:\Windows\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\VCPackages;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Tools;C:\Program Files (x86)\HTML Help Workshop;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools\x64;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Team Tools\Performance Tools;C:\Program Files (x86)\Windows Kits\8.1\bin\x64;C:\Program Files (x86)\Windows Kits\8.1\bin\x86;C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools\x64\;${PATH};C:\bb-win7',
     #         'VisualStudioVersion': '12.0',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -3969,7 +3990,7 @@ def get_builders():
         source="../../llvm-project/llvm",
         prefix="install/llvm",
         buildClang=False,
-        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
+        __LLVM_TABLEGEN=WithProperties("-DLLVM_TABLEGEN=%(builddir)s/builds/tblgen/Release/bin/llvm-tblgen.exe"),
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
         workdir=wd,
         doStepIf=Makefile_not_ready)
@@ -4060,8 +4081,8 @@ def get_builders():
         factory, "Visual Studio 11 Win64",
         source="../../llvm-project/clang",
         prefix="install/clang",
-        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(workdir)s/install/llvm/bin/llvm-config.exe"),
-        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(workdir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
+        __LLVM_CONFIG=WithProperties("-DLLVM_CONFIG=%(builddir)s/install/llvm/bin/llvm-config.exe"),
+        __CLANG_TABLEGEN=WithProperties("-DCLANG_TABLEGEN=%(builddir)s/builds/tblgen/Release/bin/clang-tblgen.exe"),
         LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="../../llvm-project/clang-tools-extra",
         CMAKE_CXX_FLAGS="/DWIN32 /D_WINDOWS /W3 /Zm1000 /bigobj /GR /EHsc",
         LLVM_LIT_ARGS="--show-suites --no-execute -q",
@@ -4162,9 +4183,9 @@ def get_builders():
     #         'LIB': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\lib;C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86',
     #         'PATH': r'D:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE;D:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin;C:\Program Files (x86)\Windows Kits\8.0\bin\x86;${PATH};C:\bb-win7',
     #         'VisualStudioVersion': '11.0',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -4210,7 +4231,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
     AddLitDOS(factory, "clang", "tools/clang/test", build_mode='Release')
     AddLitDOS(factory, "clang-tools", "tools/clang/tools/extra/test", build_mode='Release', lock=False)
@@ -4223,9 +4244,9 @@ def get_builders():
     #     slavenames=["win7"],
     #     env={
     #         'INCLUDE': r'D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\INCLUDE;D:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\ATLMFC\INCLUDE;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\include;',
-    #         'TEMP':   WithProperties("%(workdir)s/tmp/TEMP"),
-    #         'TMP':    WithProperties("%(workdir)s/tmp/TMP"),
-    #         'TMPDIR': WithProperties("%(workdir)s/tmp/TMPDIR"),
+    #         'TEMP':   WithProperties("%(builddir)s/tmp/TEMP"),
+    #         'TMP':    WithProperties("%(builddir)s/tmp/TMP"),
+    #         'TMPDIR': WithProperties("%(builddir)s/tmp/TMPDIR"),
     #         },
     #     factory=factory)
 
@@ -4271,7 +4292,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",
@@ -4330,7 +4351,7 @@ def get_builders():
     factory.addStep(ShellCommand(
             command=[
                 "rm", "-rf",
-                WithProperties("%(workdir)s/build/tools/clang/test/Modules/Output")],
+                WithProperties("%(builddir)s/build/tools/clang/test/Modules/Output")],
             flunkOnFailure=False))
     factory.addStep(LitTestCommand(
             name="test_clang",

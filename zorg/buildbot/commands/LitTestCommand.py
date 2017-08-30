@@ -3,7 +3,7 @@ import urllib
 from os.path import basename
 import buildbot
 import buildbot.status.builder
-from buildbot.status.results import FAILURE, SUCCESS
+from buildbot.process.results import FAILURE, SUCCESS
 import buildbot.steps.shell
 from buildbot.process.buildstep import LogLineObserver
 from buildbot.steps.shell import Test

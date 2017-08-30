@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from buildbot.process.factory import BuildFactory
-from buildbot.steps.source import SVN
+from buildbot.steps.source.svn import SVN
 
 svn_repos = OrderedDict([
   ('llvm'             , ("%(llvm_srcdir)s",                         'http://llvm.org/svn/llvm-project/llvm/')),

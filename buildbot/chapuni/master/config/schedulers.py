@@ -1,5 +1,5 @@
+from buildbot.plugins import schedulers, util
 from buildbot.schedulers.basic import AnyBranchScheduler
-from buildbot.schedulers.forcesched import *
 
 from buildbot.changes.filter import ChangeFilter
 
@@ -175,7 +175,7 @@ def get_schedulers():
     llvm32RA = AnyBranchScheduler(
         name="s_llvm-i686-linux-RA",
         change_filter = change_llvm_build_master,
-        treeStableTimer=2,
+        treeStableTimer=1,
         builderNames=[
             "llvm-i686-linux-RA",
             ])
@@ -185,7 +185,7 @@ def get_schedulers():
         name="s_clang-i686-linux-RA",
         change_filter = change_clang_build_master,
         treeStableTimer=2,
-        upstreams=[llvm32RA],
+        #upstreams=[llvm32RA],
         builderNames=[
             "clang-i686-linux-RA",
             ])
@@ -194,8 +194,8 @@ def get_schedulers():
     tools32RA = AnyBranchScheduler(
         name="s_clang-tools-i686-linux-RA",
         change_filter = change_cmake_llvmclang_build,
-        treeStableTimer=2,
-        upstreams=[llvm32RA, clang32RA],
+        treeStableTimer=3,
+        #upstreams=[llvm32RA, clang32RA],
         builderNames=[
             "clang-tools-i686-linux-RA",
             ])
@@ -205,7 +205,7 @@ def get_schedulers():
         name="s_lld-i686-linux-RA",
         change_filter = change_lld_build_master,
         treeStableTimer=2,
-        upstreams=[llvm32RA],
+        #upstreams=[llvm32RA],
         builderNames=[
             "lld-i686-linux-RA",
             ])
@@ -214,8 +214,8 @@ def get_schedulers():
     llvm64R = AnyBranchScheduler(
         name="s_llvm-x86_64-linux-R",
         change_filter = change_llvm_build_master,
-        treeStableTimer=2,
-        upstreams=[llvm32RA],
+        treeStableTimer=4,
+        #upstreams=[llvm32RA],
         builderNames=[
             "llvm-x86_64-linux-R",
             ])
@@ -224,8 +224,8 @@ def get_schedulers():
     clang64R = AnyBranchScheduler(
         name="s_clang-x86_64-linux-R",
         change_filter = change_clang_build_master,
-        treeStableTimer=2,
-        upstreams=[llvm64R,clang32RA],
+        treeStableTimer=5,
+        #upstreams=[llvm64R,clang32RA],
         builderNames=[
             "clang-x86_64-linux-R",
             ])
@@ -234,8 +234,8 @@ def get_schedulers():
     tools64R = AnyBranchScheduler(
         name="s_clang-tools-x86_64-linux-R",
         change_filter = change_cmake_llvmclang_build,
-        treeStableTimer=2,
-        upstreams=[llvm64R, clang64R, tools32RA],
+        treeStableTimer=6,
+        #upstreams=[llvm64R, clang64R, tools32RA],
         builderNames=[
             "clang-tools-x86_64-linux-R",
             ])
@@ -244,8 +244,8 @@ def get_schedulers():
     lld64R = AnyBranchScheduler(
         name="s_lld-x86_64-linux-R",
         change_filter = change_lld_build_master,
-        treeStableTimer=2,
-        upstreams=[llvm64R, lld32RA],
+        treeStableTimer=5,
+        #upstreams=[llvm64R, lld32RA],
         builderNames=[
             "lld-x86_64-linux-R",
             ])
@@ -255,8 +255,8 @@ def get_schedulers():
         name="s_test-llvm-i686-linux-RA",
         change_filter = change_llvm_master,
         treeStableTimer=2,
-        upstreams=[llvm32RA],
-        waitAllUpstreams=False,
+        #upstreams=[llvm32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-llvm-i686-linux-RA",
             ])
@@ -265,9 +265,9 @@ def get_schedulers():
     testclang32RA = AnyBranchScheduler(
         name="s_test-clang-i686-linux-RA",
         change_filter = change_clang_master,
-        treeStableTimer=2,
-        upstreams=[clang32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=3,
+        #upstreams=[clang32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-clang-i686-linux-RA",
             ])
@@ -276,9 +276,9 @@ def get_schedulers():
     testtools32RA = AnyBranchScheduler(
         name="s_test-clang-tools-i686-linux-RA",
         change_filter = change_tools_master,
-        treeStableTimer=2,
-        upstreams=[tools32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=4,
+        #upstreams=[tools32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-clang-tools-i686-linux-RA",
             ])
@@ -287,9 +287,9 @@ def get_schedulers():
     testlld32RA = AnyBranchScheduler(
         name="s_test-lld-i686-linux-RA",
         change_filter = change_lld_master,
-        treeStableTimer=2,
-        upstreams=[lld32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=3,
+        #upstreams=[lld32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-lld-i686-linux-RA",
             ])
@@ -298,9 +298,9 @@ def get_schedulers():
     testllvmmsc64RA = AnyBranchScheduler(
         name="s_test-llvm-msc-x64-on-i686-linux-RA",
         change_filter = change_llvm_master,
-        treeStableTimer=2,
-        upstreams=[testllvm32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=10,
+        #upstreams=[testllvm32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-llvm-msc-x64-on-i686-linux-RA",
             ])
@@ -309,9 +309,9 @@ def get_schedulers():
     testclangmsc64RA = AnyBranchScheduler(
         name="s_test-clang-msc-x64-on-i686-linux-RA",
         change_filter = change_clang_master,
-        treeStableTimer=2,
-        upstreams=[testclang32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=10,
+        #upstreams=[testclang32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-clang-msc-x64-on-i686-linux-RA",
             ])
@@ -320,9 +320,9 @@ def get_schedulers():
     testtoolsmsc64RA = AnyBranchScheduler(
         name="s_test-clang-tools-msc-x64-on-i686-linux-RA",
         change_filter = change_tools_master,
-        treeStableTimer=2,
-        upstreams=[testtools32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=10,
+        #upstreams=[testtools32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-clang-tools-msc-x64-on-i686-linux-RA",
             ])
@@ -331,9 +331,9 @@ def get_schedulers():
     testllvm64R = AnyBranchScheduler(
         name="s_test-llvm-x86_64-linux-R",
         change_filter = change_llvm_master,
-        treeStableTimer=2,
-        upstreams=[llvm64R,testllvm32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=5,
+        #upstreams=[llvm64R,testllvm32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-llvm-x86_64-linux-R",
             ])
@@ -342,9 +342,9 @@ def get_schedulers():
     testclang64R = AnyBranchScheduler(
         name="s_test-clang-x86_64-linux-R",
         change_filter = change_clang_master,
-        treeStableTimer=2,
-        upstreams=[clang64R,testclang32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=6,
+        #upstreams=[clang64R,testclang32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-clang-x86_64-linux-R",
             ])
@@ -353,9 +353,9 @@ def get_schedulers():
     testtools64R = AnyBranchScheduler(
         name="s_test-clang-tools-x86_64-linux-R",
         change_filter = change_tools_master,
-        treeStableTimer=2,
-        upstreams=[tools64R, testtools32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=7,
+        #upstreams=[tools64R, testtools32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-clang-tools-x86_64-linux-R",
             ])
@@ -364,9 +364,9 @@ def get_schedulers():
     testlld64R = AnyBranchScheduler(
         name="s_test-lld-x86_64-linux-R",
         change_filter = change_lld_master,
-        treeStableTimer=2,
-        upstreams=[lld64R, testlld32RA],
-        waitAllUpstreams=False,
+        treeStableTimer=6,
+        #upstreams=[lld64R, testlld32RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-lld-x86_64-linux-R",
             ])
@@ -375,9 +375,9 @@ def get_schedulers():
     testllvmmsc32R = AnyBranchScheduler(
         name="s_test-llvm-msc-x86-on-x86_64-linux-R",
         change_filter = change_llvm_master,
-        treeStableTimer=2,
-        upstreams=[testllvm64R, testllvmmsc64RA],
-        waitAllUpstreams=False,
+        treeStableTimer=10,
+        #upstreams=[testllvm64R, testllvmmsc64RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-llvm-msc-x86-on-x86_64-linux-R",
             ])
@@ -386,9 +386,9 @@ def get_schedulers():
     testclangmsc32R = AnyBranchScheduler(
         name="s_test-clang-msc-x86-on-x86_64-linux-R",
         change_filter = change_clang_master,
-        treeStableTimer=2,
-        upstreams=[testclang64R, testclangmsc64RA],
-        waitAllUpstreams=False,
+        treeStableTimer=10,
+        #upstreams=[testclang64R, testclangmsc64RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-clang-msc-x86-on-x86_64-linux-R",
             ])
@@ -397,9 +397,9 @@ def get_schedulers():
     testtoolsmsc32R = AnyBranchScheduler(
         name="s_test-clang-tools-msc-x86-on-x86_64-linux-R",
         change_filter = change_tools_master,
-        treeStableTimer=2,
-        upstreams=[testtools64R, testtoolsmsc64RA],
-        waitAllUpstreams=False,
+        treeStableTimer=10,
+        #upstreams=[testtools64R, testtoolsmsc64RA],
+        #waitAllUpstreams=False,
         builderNames=[
             "test-clang-tools-msc-x86-on-x86_64-linux-R",
             ])
@@ -409,59 +409,19 @@ def get_schedulers():
         name="s_i686-mingw32-RA-on-linux",
         change_filter = change_cmake_llvmclang_build,
         #treeStableTimer=None,
-        treeStableTimer=2,
-        upstreams=[llvm32RA, clang32RA, tools32RA],
+        treeStableTimer=30,
+        #upstreams=[llvm32RA, clang32RA, tools32RA],
         #waitAllUpstreams=False,
         builderNames=[
             "i686-mingw32-RA-on-linux",
             ])
     yield mingw32_linux
 
-    # llvmclang_msc19 = AnyBranchScheduler(
-    #     name="s_ninja-clang-i686-msc19-R",
-    #     change_filter = change_cmake_llvmclang,
-    #     treeStableTimer=1 * 60,
-    #     upstreams=[testllvmmsc32R, testclangmsc32R, testtoolsmsc32R, mingw32_linux],
-    #     builderNames=[
-    #         "ninja-clang-i686-msc19-R",
-    #         ])
-    # yield llvmclang_msc19
-
-    # llvmclang_msc18 = AnyBranchScheduler(
-    #     name="s_ninja-clang-i686-msc18-R",
-    #     change_filter = change_cmake_llvmclang,
-    #     treeStableTimer=1 * 60,
-    #     upstreams=[llvmclang_msc19],
-    #     builderNames=[
-    #         "ninja-clang-i686-msc18-R",
-    #         ])
-    # yield llvmclang_msc18
-
-    # llvmclang_mingw64 = AnyBranchScheduler(
-    #     name="s_cmake-clang-x64-mingw64",
-    #     change_filter = change_cmake_llvmclang,
-    #     treeStableTimer=2 * 60,
-    #     upstreams=[llvmclang_msc19, mingw32_linux],
-    #     builderNames=[
-    #         "ninja-clang-x64-mingw64-RA",
-    #         ])
-    # yield llvmclang_mingw64
-
-    # llvmclang_msc19_x64 = AnyBranchScheduler(
-    #     name="s_msbuild-llvmclang-x64-msc19-DA",
-    #     change_filter = change_cmake_llvmclang,
-    #     treeStableTimer=30 * 60,
-    #     upstreams=[llvmclang_msc19,llvmclang_mingw64,testllvmmsc64RA,testclangmsc64RA,testtoolsmsc64RA],
-    #     builderNames=[
-    #         "msbuild-llvmclang-x64-msc19-DA",
-    #         ])
-    # yield llvmclang_msc19_x64
-
     bootstrap_i686_linux = AnyBranchScheduler(
         name="s_bootstrap-clang-libcxx-lld-i686-linux",
         change_filter = change_llvmclangtoolslldcxxabi,
         treeStableTimer=15 * 60,
-        upstreams=[testllvm64R, testclang64R, testlld64R],
+        #upstreams=[testllvm64R, testclang64R, testlld64R],
         builderNames=[
             "bootstrap-clang-libcxx-lld-i686-linux",
             ])
@@ -471,13 +431,13 @@ def get_schedulers():
         name="s_clang-3stage-x86_64-linux",
         change_filter = change_llvmclang,
         treeStableTimer=60 * 60,
-        upstreams=[testllvm64R,testclang64R,bootstrap_i686_linux],
+        #upstreams=[testllvm64R,testclang64R,bootstrap_i686_linux],
         builderNames=[
             "clang-3stage-x86_64-linux",
             ])
-    yield clang_3stage_linux
+    #yield clang_3stage_linux
 
-    yield ForceScheduler(
+    yield schedulers.ForceScheduler(
         name="force",
         builderNames=[
 #            "ninja-clang-x64-mingw64-RA",
@@ -512,21 +472,27 @@ def get_schedulers():
             "bootstrap-clang-libcxx-lld-i686-linux",
             ],
 
-        # will generate a combo box
-        branch=StringParameter(name="branch", default="master"),
         # branch=ChoiceStringParameter(name="branch",
         #                              choices=["main","devel"], default="main"),
 
-        # will generate a text input
-        reason=StringParameter(name="reason",label="reason:<br>",
-                               required=False, size=80),
 
         # will generate nothing in the form, but revision, repository,
         # and project are needed by buildbot scheduling system so we
         # need to pass a value ("")
-        revision=StringParameter(name="revision", required=True,default=""),
-        repository=FixedParameter(name="repository", default=""),
-        project=FixedParameter(name="project", default="llvm-project"),
+        codebases=[
+            util.CodebaseParameter(
+                "",
+                name="Main repository",
+                # will generate a combo box
+                branch=util.StringParameter(name="branch", default="master"),
+                # will generate a text input
+                reason=util.StringParameter(name="reason",label="reason:<br>",
+                                       required=False, size=80),
+                revision=util.StringParameter(name="revision", required=True,default=""),
+                repository=util.FixedParameter(name="repository", default=""),
+                project=util.FixedParameter(name="project", default="llvm-project"),
+            ),
+        ],
 
         # in case you dont require authentication this will display
         # input for user to type his name
