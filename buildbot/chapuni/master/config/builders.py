@@ -27,6 +27,11 @@ def Makefile_not_ready(step):
 def Makefile_not_ready2(step):
     return step.build.getProperty("exists_Makefile2") != "OK"
 
+def git_tag_updated(propname):
+    return lambda step: (
+        step.build.getProperty(propname).startswith("Updated tag ")
+    )
+
 def Revision_known(step):
     return not step.build.getProperty("revision_hash") in ("", None)
 
@@ -91,36 +96,6 @@ def CheckMakefile2(factory, makefile="Makefile", workdir="build"):
 
 # Factories
 def AddGitLLVMTree(factory, repo, ref):
-    factory.addStep(SetProperty(
-            property="revision_hash",
-            doStepIf=Revision_unknown,
-            hideStepIf=lambda results, s: results==SKIPPED,
-            value=''))
-    factory.addStep(SetPropertyFromCommand(
-            name="git-hash-1",
-            command=[
-                "git",
-                "--git-dir", ref,
-                "rev-list",
-                "--no-walk",
-                "--abbrev-commit",
-                WithProperties("refs/tags/%(revision)s"),
-                ],
-            property="revision_hash",
-            doStepIf=Revision_unknown,
-            hideStepIf=lambda results, s: results==SKIPPED,
-            flunkOnFailure=False))
-    factory.addStep(ShellCommand(
-            name="git-tag-hash",
-            command=[
-                "git", "tag", "-f",
-                WithProperties("%(revision)s"),
-                WithProperties("%(revision_hash)s"),
-                ],
-            doStepIf=Revision_known,
-            hideStepIf=lambda results, s: results==SKIPPED,
-            workdir='llvm-project',
-            flunkOnFailure=False));
     if ref is None:
         factory.addStep(Git(repourl=repo,
                             timeout=3600,
@@ -135,25 +110,24 @@ def AddGitLLVMTree(factory, repo, ref):
             command=["git", "describe", "--tags"],
             workdir="llvm-project",
             property="got_revision"))
-    factory.addStep(ShellCommand(command=["git",
-                                          "clean",
-                                          "-fx"],
-                                 workdir="llvm-project"))
+    factory.addStep(ShellCommand(
+        command=["git", "clean", "-fx"],
+        name="git-clean",
+        workdir="llvm-project"))
 
 def AddGitFetch(factory, ref, locks=[]):
+    # Expects "^Updated"
     factory.addStep(SetPropertyFromCommand(
-        name="git-hash-0",
+        name="git-tag-0",
         command=[
-            "git",
-            "--git-dir", ref,
-            "rev-list",
-            "--no-walk",
-            "--abbrev-commit",
-            WithProperties("refs/tags/%(revision)s"),
+            "sh", "-c",
+            WithProperties("git tag -f %(revision)s %(commit)s && echo OK"),
         ],
-        property="revision_hash",
+        workdir='llvm-project',
+        property="result_tag_0",
         hideStepIf=lambda results, s: results==FAILURE,
         flunkOnFailure=False))
+
     factory.addStep(ShellCommand(
         name="git-fetch",
         command=[
@@ -162,9 +136,25 @@ def AddGitFetch(factory, ref, locks=[]):
             "fetch",
             "--prune"],
         locks=locks,
-        doStepIf=Revision_unknown,
+        doStepIf=lambda step: (
+            step.build.getProperty("result_tag_0") != "OK"
+        ),
         hideStepIf=lambda results, s: results==SKIPPED,
-        flunkOnFailure=False));
+        flunkOnFailure=False))
+
+    factory.addStep(ShellCommand(
+        name="git-tag-1",
+        command=[
+            "git", "tag", "-f",
+            WithProperties("%(revision)s"),
+            WithProperties("%(commit)s"),
+        ],
+        workdir='llvm-project',
+        doStepIf=lambda step: (
+            step.build.getProperty("result_tag_0") != "OK"
+        ),
+        hideStepIf=lambda results, s: results==SKIPPED,
+        flunkOnFailure=True))
 
 def AddGitSled4(factory):
     AddGitFetch(
@@ -173,8 +163,7 @@ def AddGitSled4(factory):
         [sled4_git_lock.access('counting')])
     AddGitLLVMTree(
         factory,
-        'ssh://bb@t.pgr.jp:19922/var/cache/llvm-project-tree.git',
-        #'/home/tnakamura/llvm/llvm-project/',
+        '/home/bb9/llvm-project.git',
         '/home/bb9/llvm-project.git')
 
 def AddGitSled3(factory):
