@@ -593,10 +593,10 @@ def BuildStageNlibcxx(factory, n,
 
         # Tweaks
         LLVM_FORCE_USE_OLD_TOOLCHAIN="ON",
-        __CMAKE_CXX_FLAGS=WithProperties("-Wno-unused-command-line-argument -stdlib=platform -isystem %%(workdir)s/%s/projects/libcxx/include -isystem %%(workdir)s/llvm-project/libcxx/include" % workdir),
-        __CMAKE_EXE_LINKER_FLAGS   =WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib -Wl,-rpath,%%(workdir)s/%s/lib" % (workdir, workdir)),
-        __CMAKE_MODULE_LINKER_FLAGS=WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib" % (workdir)),
-        __CMAKE_SHARED_LINKER_FLAGS=WithProperties("-stdlib=libc++ -L %%(workdir)s/%s/lib" % (workdir)),
+        __CMAKE_CXX_FLAGS=WithProperties("-DCMAKE_CXX_FLAGS=-Wno-unused-command-line-argument -stdlib=platform -isystem %%(workdir)s/%s/projects/libcxx/include -isystem %%(workdir)s/llvm-project/libcxx/include" % workdir),
+        __CMAKE_EXE_LINKER_FLAGS   =WithProperties("-DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ -L %%(workdir)s/%s/lib -Wl,-rpath,%%(workdir)s/%s/lib" % (workdir, workdir)),
+        __CMAKE_MODULE_LINKER_FLAGS=WithProperties("-DCMAKE_MODULE_LINKER_FLAGS=-stdlib=libc++ -L %%(workdir)s/%s/lib" % (workdir)),
+        __CMAKE_SHARED_LINKER_FLAGS=WithProperties("-DCMAKE_SHARED_LINKER_FLAGS=-stdlib=libc++ -L %%(workdir)s/%s/lib" % (workdir)),
 
         prefix="builds/install/stagen",
         workdir=workdir)
