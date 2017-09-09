@@ -65,18 +65,18 @@ def get_status_targets(standard_builders):
                 'exceptionToSuccess': 1,
                 'exception': 1,
                 }),
-        buildbot.status.words.IRC(
-            "irc.freenode.net", "bb-chapuni",
-            channels=[{"channel": "#llvmjp"}],
-            allowForce = True,
-            notify_events={
-                'successToFailure': 1,
-                'warningsToFailure': 1,
-                'failureToSuccess': 1,
-                'warningsToSuccess': 1,
-                'exceptionToSuccess': 1,
-                'exception': 1,
-                }),
+        # buildbot.status.words.IRC(
+        #     "irc.freenode.net", "bb-chapuni",
+        #     channels=[{"channel": "#llvmjp"}],
+        #     allowForce = True,
+        #     notify_events={
+        #         'successToFailure': 1,
+        #         'warningsToFailure': 1,
+        #         'failureToSuccess': 1,
+        #         'warningsToSuccess': 1,
+        #         'exceptionToSuccess': 1,
+        #         'exception': 1,
+        #         }),
         InformativeMailNotifier(
             fromaddr="chapuni@t.pgr.jp",
             extraRecipients=["geek4civic@gmail.com"],
