@@ -5,8 +5,8 @@ from buildbot.changes.filter import ChangeFilter
 
 import re
 
-def filter_t(l, e): return filter(lambda x: re.search(e, x), l)
-def filter_f(l, e): return filter(lambda x: not re.search(e, x), l)
+def filter_t(l, e): return list(filter(lambda x: re.search(e, x), l))
+def filter_f(l, e): return list(filter(lambda x: not re.search(e, x), l))
 
 def Tllvm(l): return filter_t(l, r'^llvm/')
 def Tlld(l): return filter_t(l, r'^lld/')
