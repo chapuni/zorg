@@ -5,168 +5,149 @@ from buildbot.changes.filter import ChangeFilter
 
 import re
 
-def filter_t(l, e): return list(filter(lambda x: re.search(e, x), l))
-def filter_f(l, e): return list(filter(lambda x: not re.search(e, x), l))
 
-def Tllvm(l): return filter_t(l, r'^llvm/')
-def Tlld(l): return filter_t(l, r'^lld/')
-def Tclang(l): return filter_t(l, r'^clang/')
-def Tclang_extra(l): return filter_t(l, r'^clang-tools-extra/')
-def Tdragonegg(l): return filter_t(l, r'^dragonegg/')
-def Tlibcxx(l): return filter_t(l, r'^libcxx/')
-def Tlibcxxabi(l): return filter_t(l, r'^libcxxabi/')
-def Tcmake(l):
-    return filter_t(l, r'^llvm/cmake/') + filter_t(l, r'/CMakeLists\.txt$')
-def Tllvmlib(l):
-    return filter_t(l, r'^llvm/(include|lib|tools|utils)/')
-def Fllvmtest(l): return filter_f(l, r'^llvm/test/.+/')
-def Flldtest(l): return filter_f(l, r'^lld/test/.+/')
-def Fclangtest(l): return filter_f(l, r'^clang/test/.+/')
-def Ftoolstest(l): return filter_f(l, r'^clang-tools-extra/test/.+/')
-def Fhtml(l): return filter_f(l, r'\.(TXT|html|rst)(\.\w)?$')
-def FGNUmake(l): return filter_f(l, r'/Makefile(\.\w+)?$')
-def Fautoconf(l): return filter_f(FGNUmake(l), r'^llvm/(autoconf/|config.*)')
-def Fcmakefiles(l): return filter_f(l, r'/CMakeLists\.txt$')
-def Fcmake(l): return filter_f(Fcmakefiles(l), r'^llvm/cmake/')
 
-#def filter_llvm(change):
-#    return len(Tllvm(getattr(change, "files"))) > 0
+import sys
 
-#change_llvm = ChangeFilter(filter_fn = filter_llvm)
+files = [line.rstrip() for line in sys.stdin]
 
-def filter_cmake_llvm(change):
-    l = Fautoconf(Tllvm(getattr(change, "files")))
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Fhtml(l)) > 0
+print(files)
 
-change_llvm_master = ChangeFilter(filter_fn = filter_cmake_llvm,
-                                  #branch=['master'],
-                                  )
+# Projects
+def is_llvm(l): return l.startswith("llvm/")
+def is_lld(l): return l.startswith("lld/")
+def is_clang(l): return l.startswith("clang/")
+def is_clang_extra(l): return l.startswith("clang-tools-extra/")
+def is_dragonegg(l): return l.startswith("dragonegg/")
+def is_libcxx(l): return l.startswith("libcxx/")
+def is_libcxxabi(l): return l.startswith("libcxxabi/")
 
-def filter_cmake_llvm_build(change):
-    l = Fautoconf(Tllvm(getattr(change, "files")))
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Fllvmtest(Fhtml(l))) > 0
+# Per-project
+def is_llvmlib(l): return re.match(r'"llvm/(include|lib|tools|utils)/', l)
+def is_llvmtest(l): return re.match(r'^llvm/test/.+/', l)
+def is_lldtest(l): return re.match(r'^lld/test/.+/', l)
+def is_clangtest(l): return re.match(r'^clang/test/.+/', l)
+def is_toolstest(l): return re.match(r'^clang-tools-extra/test/.+/', l)
 
-change_llvm_build_master = ChangeFilter(filter_fn = filter_cmake_llvm_build,
-                                  #branch=['master'],
-                                  )
+# Per-file
 
-def filter_cmake_clang_build(change):
-    l = Fautoconf(getattr(change, "files"))
-    l = Tclang(l) + Tllvm(l)
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Fclangtest(Fllvmtest(Fhtml(l)))) > 0
-
-change_clang_build_master = ChangeFilter(filter_fn = filter_cmake_clang_build,
-                                  #branch=['master'],
-                                  )
-
-def filter_all(change):
-    l = Fhtml(getattr(change, "files"))
-    return len(Tclang(l) + Tllvm(l)) > 0
-
-change_llvmclang = ChangeFilter(filter_fn = filter_all)
-change_llvmclang_release_38 = ChangeFilter(
-    filter_fn = filter_all,
-    branch=['release_38'],
+# llvm/.gitignore
+# /*.rst
+# Don't detect ".txt". They are userd everywhere.
+def is_nonbuildfile(l):
+    return (
+        not l.endswith("/CMakeLists.txt")
+        and not l.endswith("/LLVMBuild.txt")
+        and not re.search(r'^[^/]+/test/', l)
+        and (
+            re.search("/(README|LICENSE|NOTES|TODO)[^.]*\.txt$", l,
+                      flags=re.I)
+            or re.search(r'^[^/]+/\w+\.txt$', l)
+            or re.search(r'^[^/]+/(doc|www|\.\w+)', l)
+            or re.search(r'\.(TXT|html|rst)(\.\w+)?$', l)
+        )
     )
 
-def filter_autoconf_llvmclang(change):
-    l = Fcmake(getattr(change, "files"))
-    l = Tclang(l) + Tllvm(l)
-    return len(Fhtml(l)) > 0
+# Per builder
+def genChangeFilter(expression, **kwargs):
+    return ChangeFilter(
+        filter_fn = lambda change:
+            next(
+            (
+                l for l in filter(
+                    expression,
+                    getattr(change, "files"))),
+            None) is not None,
+        **kwargs)
 
-change_autoconf_llvmclang = ChangeFilter(
-    filter_fn = filter_autoconf_llvmclang,
-    branch=['release_38'],
+change_llvm_master = genChangeFilter(
+    lambda l: (
+        is_llvm(l)
+        and not is_nonbuildfile(l)
+        ),
     )
 
-def filter_cmake_llvmclang(change):
-    l = Fautoconf(getattr(change, "files"))
-    l = Tclang(l) + Tllvm(l) + Tclang_extra(l)
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Fhtml(l)) > 0
-
-change_cmake_llvmclang = ChangeFilter(filter_fn = filter_cmake_llvmclang)
-change_cmake_llvmclang_release_38 = ChangeFilter(
-    filter_fn = filter_cmake_llvmclang,
-    branch=['release_38'],
+change_llvm_build_master = genChangeFilter(
+    lambda l: (
+        is_llvm(l)
+        and not is_llvmtest(l)
+        and not is_nonbuildfile(l)
+        ),
     )
 
-def filter_cmake_llvmclang_build(change):
-    l = Fautoconf(getattr(change, "files"))
-    l = Tclang(l) + Tllvm(l) + Tclang_extra(l)
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Ftoolstest(Fclangtest(Fllvmtest(Fhtml(l))))) > 0
+change_clang_master = genChangeFilter(
+    lambda l: (
+        (is_llvm(l) or is_clang(l))
+        and not is_llvmtest(l)
+        and not is_nonbuildfile(l)
+        ),
+    )
 
-change_cmake_llvmclang_build = ChangeFilter(filter_fn = filter_cmake_llvmclang_build)
+change_clang_build_master = genChangeFilter(
+    lambda l: (
+        (is_llvm(l) or is_clang(l))
+        and not is_llvmtest(l)
+        and not is_clangtest(l)
+        and not is_nonbuildfile(l)
+        ),
+    )
 
-def filter_cmake_lld_build(change):
-    l = Fautoconf(getattr(change, "files"))
-    l = Tlld(l) + Tllvm(l)
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Flldtest(Fllvmtest(Fhtml(l)))) > 0
+change_llvmclang = genChangeFilter(
+    lambda l: (
+        (is_llvm(l) or is_clang(l))
+        and not is_nonbuildfile(l)
+        ),
+    )
 
-change_lld_build_master = ChangeFilter(filter_fn = filter_cmake_lld_build,
-                                   #branch=['master'],
-                                   )
+# FIXME: Rename. It's for clang-tools-extra
+change_cmake_llvmclang_build = genChangeFilter(
+    lambda l: (
+        (is_llvm(l) or is_clang(l) or is_clang_extra(l))
+        and not is_llvmtest(l)
+        and not is_clangtest(l)
+        and not is_toolstest(l)
+        and not is_nonbuildfile(l)
+        ),
+    branch=['master'],
+    )
 
-def filter_cmake_lld(change):
-    l = Fautoconf(getattr(change, "files"))
-    l = Tlld(l) + Tllvm(l)
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Fllvmtest(Fhtml(l))) > 0
+change_lld_build_master = genChangeFilter(
+    lambda l: (
+        (is_llvm(l) or is_lld(l))
+        and not is_llvmtest(l)
+        and not is_lldtest(l)
+        and not is_nonbuildfile(l)
+        ),
+    )
 
-change_lld_master = ChangeFilter(filter_fn = filter_cmake_lld,
-                                   #branch=['master'],
-                                   )
+change_lld_master = genChangeFilter(
+    lambda l: (
+        (is_llvm(l) or is_lld(l))
+        and not is_llvmtest(l)
+        and not is_nonbuildfile(l)
+        ),
+    )
 
-def filter_cmake_clang(change):
-    l = Fautoconf(getattr(change, "files"))
-    l = Tclang(l) + Tllvm(l)
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Fllvmtest(Fhtml(l))) > 0
+change_tools_master = genChangeFilter(
+    lambda l: (
+        (is_llvm(l) or is_clang(l) or is_clang_extra(l))
+        and not is_llvmtest(l)
+        and not is_clangtest(l)
+        and not is_nonbuildfile(l)
+        ),
+    )
 
-change_clang_master = ChangeFilter(filter_fn = filter_cmake_clang,
-                                   #branch=['master'],
-                                   )
-
-def filter_cmake_tools(change):
-    l = Fautoconf(getattr(change, "files"))
-    l = Tclang(l) + Tllvm(l) + Tclang_extra(l)
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Fclangtest(Fllvmtest(Fhtml(l)))) > 0
-
-change_tools_master = ChangeFilter(filter_fn = filter_cmake_tools,
-                                   #branch=['master'],
-                                   )
-
-def filter_cmake_dragonegg(change):
-    l = Fautoconf(getattr(change, "files"))
-    l = Tllvm(l) + Tdragonegg(l)
-    if len(Tcmake(l)) > 0:
-        return True
-    return len(Fllvmtest(Fhtml(l))) > 0
-
-change_dragonegg_master = ChangeFilter(filter_fn = filter_cmake_dragonegg,
-                                   #branch=['master'],
-                                   )
-
-def filter_llvmclangtoolslldcxxabi(change):
-    l = Fhtml(getattr(change, "files"))
-    return len(Tclang(l) + Tclang_extra(l) + Tllvm(l) + Tlld(l) + Tlibcxx(l) + Tlibcxxabi(l)) > 0
-
-change_llvmclangtoolslldcxxabi = ChangeFilter(filter_fn = filter_llvmclangtoolslldcxxabi)
+change_llvmclangtoolslldcxxabi = genChangeFilter(
+    lambda l: (
+        (is_llvm(l)
+         or is_clang(l)
+         or is_clang_extra(l)
+         or is_libcxx(l)
+         or is_libcxxabi(l)
+         or is_lld(l))
+        and not is_nonbuildfile(l)
+        ),
+    )
 
 # Configure the Schedulers, which decide how to react to incoming changes.  In this
 # case, just kick off a 'runtests' build
