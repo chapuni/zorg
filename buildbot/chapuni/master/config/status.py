@@ -30,10 +30,12 @@ def get_status_targets(standard_builders):
     #     )
 
     # default_email = config.options.get('Master Options', 'default_email')
+    nick_prefix = config.options.get('Master Options', 'nick_prefix')
 
     return [
         reporters.IRC(
-            "irc.oftc.net", "bb9-chapuni",
+            "irc.freenode.net",
+            nick_prefix+"chapuni",
             channels=[
                 {"channel": "#llvm-build"},
             ],
