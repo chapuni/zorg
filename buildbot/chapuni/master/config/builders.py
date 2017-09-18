@@ -121,7 +121,7 @@ def AddGitFetch(factory, ref, locks=[]):
         name="git-tag-0",
         command=[
             "sh", "-c",
-            WithProperties("git tag -f %(revision)s %(commit)s && echo OK"),
+            WithProperties("(git tag -f %(revision)s %(commit)s > /dev/null) && echo OK"),
         ],
         workdir='llvm-project',
         property="result_tag_0",
