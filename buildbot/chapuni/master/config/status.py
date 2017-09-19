@@ -33,23 +33,6 @@ def get_status_targets(standard_builders):
     nick_prefix = config.options.get('Master Options', 'nick_prefix')
 
     return [
-        reporters.IRC(
-            "irc.freenode.net",
-            nick_prefix+"chapuni",
-            channels=[
-                {"channel": "#llvm-build"},
-            ],
-            useColors=True,
-            allowForce=False,
-            showBlameList=True,
-            #useRevisions=True,
-            #port=6697,
-            #useSSL=True,
-            notify_events={
-                'exception': 1,
-                'successToFailure': 1,
-                'failureToSuccess': 1,
-            }),
         # reporters.IRC(
         #     "irc.freenode.net", "bb-chapuni",
         #     channels=[
@@ -89,29 +72,38 @@ def get_status_targets(standard_builders):
         #         'warningsToSuccess': 1,
         #         'exceptionToSuccess': 1,
         #         }),
-        # buildbot.status.words.IRC(
-        #     host = "irc.oftc.net", nick = "bb-pgr", channels = ["#llvm-build"],
-        #     allowForce = True,
-        #     notify_events={
-        #         'successToFailure': 1,
-        #         'warningsToFailure': 1,
-        #         'failureToSuccess': 1,
-        #         'warningsToSuccess': 1,
-        #         'exceptionToSuccess': 1,
-        #         'exception': 1,
-        #         }),
-        # buildbot.status.words.IRC(
-        #     "irc.freenode.net", "bb-chapuni",
-        #     channels=[{"channel": "#llvmjp"}],
-        #     allowForce = True,
-        #     notify_events={
-        #         'successToFailure': 1,
-        #         'warningsToFailure': 1,
-        #         'failureToSuccess': 1,
-        #         'warningsToSuccess': 1,
-        #         'exceptionToSuccess': 1,
-        #         'exception': 1,
-        #         }),
+        reporters.IRC(
+            "irc.oftc.net",
+            nick_prefix+"pgr",
+            channels = {"channel": "#llvm-build"},
+            useColors=True,
+            allowForce=False,
+            showBlameList=True,
+            notify_events={
+                'successToFailure': 1,
+                'warningsToFailure': 1,
+                'failureToSuccess': 1,
+                'warningsToSuccess': 1,
+                'exceptionToSuccess': 1,
+                'exception': 1,
+                }),
+        reporters.IRC(
+            "irc.freenode.net",
+            nick_prefix+"chapuni",
+            channels=[
+                {"channel": "#llvm-build"},
+            ],
+            useColors=True,
+            allowForce=False,
+            showBlameList=True,
+            #useRevisions=True,
+            #port=6697,
+            #useSSL=True,
+            notify_events={
+                'exception': 1,
+                'successToFailure': 1,
+                'failureToSuccess': 1,
+            }),
         # InformativeMailNotifier(
         #     fromaddr="chapuni@t.pgr.jp",
         #     extraRecipients=["geek4civic@gmail.com"],
