@@ -4,7 +4,9 @@ import os
 
 from datetime import datetime, timedelta
 from twisted.python import log
+from zope.interface import implementer
 
+@implementer(buildbot.interfaces.IEmailLookup)
 class ConfigEmailLookup(buildbot.util.ComparableMixin):
   """
   Email lookup implementation which searchs a user specified configuration
@@ -14,7 +16,6 @@ class ConfigEmailLookup(buildbot.util.ComparableMixin):
   # TODO: Document this class.
   # Class loads llvm_authors from file and reload if the file was updated.
 
-  zope.interface.implements(buildbot.interfaces.IEmailLookup)
   compare_attrs = ["author_filename", "default_address", "only_addresses"]
 
   def __init__(self, author_filename, default_address, only_addresses = None, update_interval=timedelta(hours=1)):

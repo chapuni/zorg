@@ -1,6 +1,8 @@
 import buildbot
+import zope
+
 from buildbot import util, interfaces
-from zope.interface import implements
+from zope.interface import implements, implementer
 from buildbot.reporters import mail
 from buildbot.status import builder
 
@@ -30,11 +32,11 @@ else:
             data += '\n\n'
         return data
 
+@implementer(interfaces.IEmailSender)
 class InformativeMailNotifier(mail.MailNotifier):
     """MailNotifier subclass which provides additional information about the
     build failure inside the email."""
 
-    implements(interfaces.IEmailSender)
     compare_attrs = (list(mail.MailNotifier.compare_attrs) +
                      ["num_lines", "only_failure_logs"])
 
