@@ -1510,7 +1510,6 @@ def get_builders():
 
     Compare23(
         factory,
-        warn=False,
         )
 
     yield BuilderConfig(
