@@ -5,9 +5,9 @@ class BatchFileDownload(FileDownload):
     def __init__(self, **kwargs):
         if 'command' in kwargs:
             if 'mastersrc' in kwargs:
-                raise ValueError,"Unexpected 'mastersrc' argument."
+                raise ValueError("Unexpected 'mastersrc' argument.")
             if 'slavedest' in kwargs:
-                raise ValueError,"Unexpected 'slavedest' argument."
+                raise ValueError("Unexpected 'slavedest' argument.")
 
             # This is the initial construction, create a temporary
             # batch file to run the command.

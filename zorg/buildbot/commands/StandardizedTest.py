@@ -42,7 +42,7 @@ class StandardizedTest(buildbot.steps.shell.Test):
         for result,test,log in self.parseLog(lines):
             test = test.strip()
             if result not in self.allKnownCodes:
-                raise ValueError,'test command return invalid result code (%s)!' % result
+                raise ValueError('test command return invalid result code (%s)!' % result)
 
             # Convert codes for flaky and ignored tests.
             if test in self.flakyTests:
