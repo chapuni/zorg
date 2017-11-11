@@ -578,7 +578,7 @@ def BuildStageNlibcxx(factory, n,
         __CMAKE_CXX_COMPILER=WithProperties("-DCMAKE_CXX_COMPILER=%%(builddir)s/%s/clang++" % tools),
         CMAKE_C_FLAGS  ="",
         LLVM_TARGETS_TO_BUILD="all",
-        LLVM_LIT_ARGS="-v",
+        LLVM_LIT_ARGS="--shuffle -v",
         PYTHON_EXECUTABLE="/usr/bin/python3",
 
         # Tweaks
@@ -951,7 +951,7 @@ def BuildNinja(
     if doClean:
         AddCleanBin(factory)
 
-    #PatchLLVMClang(factory, "llvmclang.diff")
+    PatchLLVMClang(factory, "llvmclang.diff")
     CheckMakefile(factory, makefile="build.ninja")
     cmake_args={
         'CMAKE_EXE_LINKER_FLAGS'   : '-fuse-ld=gold',
@@ -1442,7 +1442,7 @@ def get_builders():
 
     BlobPre(factory)
 
-    #PatchLLVMClang(factory, "llvmclang.diff")
+    PatchLLVMClang(factory, "llvmclang.diff")
 
     AddCMakeCentOS6Ninja(
         factory,
@@ -1458,7 +1458,7 @@ def get_builders():
         LLVM_BUILD_EXAMPLES="ON",
         LLVM_BUILD_TESTS="ON",
         CLANG_BUILD_EXAMPLES="ON",
-        LLVM_LIT_ARGS="-v",
+        LLVM_LIT_ARGS="--shuffle -v",
         buildClang=True,
         LLVM_ENABLE_PROJECTS="clang;lld")
 
