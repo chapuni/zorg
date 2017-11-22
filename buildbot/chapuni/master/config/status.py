@@ -45,8 +45,11 @@ def get_status_targets(standard_builders):
             mode = "problem",
             builders = standard_builders),
         buildbot.status.words.IRC(
-            host = "irc.oftc.net", nick = "bb-chapuni", channels = ["#llvm"],
-            allowForce = True,
+            host = "irc.oftc.net",
+#            port=6669,
+            nick = "bb-chapuni", channels = ["#llvm"],
+#            allowForce = True,
+            failedDelay=60,
             notify_events={
                 'successToFailure': 1,
                 'warningsToFailure': 1,
@@ -55,8 +58,10 @@ def get_status_targets(standard_builders):
                 'exceptionToSuccess': 1,
                 }),
         buildbot.status.words.IRC(
-            host = "irc.oftc.net", nick = "bb-pgr", channels = ["#llvm-build"],
-            allowForce = True,
+            host = "irc.oftc.net",
+#            port=6668,
+            nick = "bb-pgr", channels = ["#llvm-build"],
+#            allowForce = True,
             notify_events={
                 'successToFailure': 1,
                 'warningsToFailure': 1,
@@ -66,9 +71,12 @@ def get_status_targets(standard_builders):
                 'exception': 1,
                 }),
         # buildbot.status.words.IRC(
-        #     "irc.freenode.net", "bb-chapuni",
+        #     "irc.freenode.net",
+        #     "bb-chapuni",
         #     channels=[{"channel": "#llvmjp"}],
         #     allowForce = True,
+        #     useSSL=True,
+        #     port=6697,
         #     notify_events={
         #         'successToFailure': 1,
         #         'warningsToFailure': 1,
